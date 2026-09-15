@@ -1,8 +1,8 @@
-# Tahta Kilit'i tek klasore yayinlar.
+﻿# Tahta Kilit'i tek klasore yayinlar.
 #
 #   powershell -ExecutionPolicy Bypass -File tools\yayinla.ps1
 #
-# Cikti: yayin\  — servis, kilit ekrani ve kurulum sihirbazi bir arada.
+# Cikti: yayin\  - servis, kilit ekrani ve kurulum sihirbazi bir arada.
 # Kendi kendine yeterli (self-contained) yayinlanir; tahtaya ayrica .NET
 # kurmak gerekmez.
 

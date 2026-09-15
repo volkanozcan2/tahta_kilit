@@ -1,9 +1,9 @@
-# Tahta Kilit'i Windows Korumali Alan'da (Windows Sandbox) acar.
+﻿# Tahta Kilit'i Windows Korumali Alan'da (Windows Sandbox) acar.
 #
 #   powershell -ExecutionPolicy Bypass -File tools\sandbox-ac.ps1
 #
 # Neden: Windows 11'in Akilli Uygulama Denetimi imzasiz programlari engelliyor.
-# Korumali Alan'da bu kisitlama yok ve pencereyi kapatinca hicbir iz kalmiyor —
+# Korumali Alan'da bu kisitlama yok ve pencereyi kapatinca hicbir iz kalmiyor -
 # kilit ekranini denemek icin en guvenli yer. Takilirsan Korumali Alan
 # penceresini kapatman yeterli.
 #
@@ -42,7 +42,7 @@ $wsb = Join-Path $env:TEMP 'tahta-kilit.wsb'
     <Command>powershell.exe -NoExit -ExecutionPolicy Bypass -File C:\kaynak\tools\sandbox-hazirla.ps1</Command>
   </LogonCommand>
 </Configuration>
-"@ | Set-Content -Path $wsb -Encoding UTF8
+"@ | ForEach-Object { [IO.File]::WriteAllText($wsb, $_) }  # BOM'suz yaz
 
 Write-Host "Korumali Alan aciliyor. Icinde .NET kurulup testler kosulacak;"
 Write-Host "ilk acilis birkac dakika surer."

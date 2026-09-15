@@ -1,4 +1,4 @@
-# Windows Korumali Alan'in ICINDE calisir; tools\sandbox-ac.ps1 tarafindan
+﻿# Windows Korumali Alan'in ICINDE calisir; tools\sandbox-ac.ps1 tarafindan
 # otomatik baslatilir. Elle calistirman gerekmez.
 #
 # Korumali Alan her acilista bos bir Windows'tur: .NET burada kurulur,
@@ -7,7 +7,7 @@
 $ErrorActionPreference = 'Stop'
 $hedef = 'C:\tahta_kilit'
 
-Write-Host "=== Tahta Kilit — Korumali Alan hazirligi ===" -ForegroundColor Cyan
+Write-Host "=== Tahta Kilit - Korumali Alan hazirligi ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Salt okunur baglanan kaynagi yazilabilir bir yere kopyala.
@@ -20,9 +20,20 @@ $betik = Join-Path $env:TEMP 'dotnet-install.ps1'
 Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $betik -UseBasicParsing
 & $betik -Channel 8.0 -InstallDir 'C:\dotnet' -NoPath | Out-Null
 
-$env:PATH = "C:\dotnet;$env:PATH"
+$env:PATH = 'C:\dotnet;' + $env:PATH
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
+
+# Makine genelindeki PATH'e de ekle: yoksa Korumali Alan'da acilan YENI
+# pencerelerde dotnet bulunamaz.
+try {
+    $makine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    if ($makine -notlike '*C:\dotnet*') {
+        [Environment]::SetEnvironmentVariable('Path', 'C:\dotnet;' + $makine, 'Machine')
+    }
+} catch {
+    Write-Warning 'Makine PATH ayarlanamadi; dotnet yalnizca BU pencerede kullanilabilir.'
+}
 
 Write-Host "[3/3] Testler kosuluyor..."
 Set-Location $hedef

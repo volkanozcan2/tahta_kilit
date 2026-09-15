@@ -1,4 +1,4 @@
-# Tahta Kilit'i KURMADAN dener.
+﻿# Tahta Kilit'i KURMADAN dener.
 #
 #   powershell -ExecutionPolicy Bypass -File tools\dene.ps1
 #

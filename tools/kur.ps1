@@ -1,4 +1,4 @@
-# Tahta Kilit'i bu bilgisayara kurar. YONETICI olarak calistirilmalidir.
+﻿# Tahta Kilit'i bu bilgisayara kurar. YONETICI olarak calistirilmalidir.
 #
 #   powershell -ExecutionPolicy Bypass -File tools\kur.ps1
 #

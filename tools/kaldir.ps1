@@ -1,4 +1,4 @@
-# Tahta Kilit'i bu bilgisayardan kaldirir. YONETICI olarak calistirilmalidir.
+﻿# Tahta Kilit'i bu bilgisayardan kaldirir. YONETICI olarak calistirilmalidir.
 #
 # DIKKAT: Gizli anahtar silinir; ogretmenlerin telefonundaki kayit gecersiz olur.
 

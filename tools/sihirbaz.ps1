@@ -1,9 +1,9 @@
-# Kurulum sihirbazini acar.
+﻿# Kurulum sihirbazini acar.
 #
 #   powershell -ExecutionPolicy Bypass -File tools\sihirbaz.ps1
 #
 # `dotnet run` kullanilamaz: sihirbaz yonetici yetkisi ister, dotnet run ise
-# yetki yukseltemez ve "İstenen işlem için yükseltme gerekiyor" (hata 740)
+# yetki yukseltemez ve "Istenen islem icin yukseltme gerekiyor" (hata 740)
 # verir. Bu betik programi derleyip yukseltme istegiyle baslatir.
 
 $ErrorActionPreference = 'Stop'
