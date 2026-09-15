@@ -15,9 +15,14 @@ Write-Host "[1/3] Proje kopyalaniyor..."
 robocopy C:\kaynak $hedef /E /XD bin obj node_modules yayin .git /NFL /NDL /NJH /NJS /NC /NS | Out-Null
 $global:LASTEXITCODE = 0  # robocopy basarida da sifir disi kod dondurur
 
+# .NET varsayilan konuma kurulur. Standart disi bir klasore kurulursa
+# uygulamalar (ayri surec olarak baslayan WPF programlari gibi) calisma
+# zamanini bulamiyor: "You must install .NET Desktop Runtime" hatasi.
+$dotnetDir = Join-Path $env:ProgramFiles 'dotnet'
+$dotnetExe = Join-Path $dotnetDir 'dotnet.exe'
+
 # Betik iki kez calisabiliyor (Korumali Alan acilista kendisi baslatiyor).
 # Ikinci kurulum, calisan dotnet.exe'yi ustune yazmaya calisip patliyordu.
-$dotnetExe = 'C:\dotnet\dotnet.exe'
 $kurulu = $false
 if (Test-Path $dotnetExe) {
     try {
@@ -34,22 +39,24 @@ if ($kurulu) {
     Write-Host "[2/3] .NET 8 SDK kuruluyor (birkac dakika surebilir)..."
     $betik = Join-Path $env:TEMP 'dotnet-install.ps1'
     Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $betik -UseBasicParsing
-    & $betik -Channel 8.0 -InstallDir 'C:\dotnet' -NoPath | Out-Null
+    & $betik -Channel 8.0 -InstallDir $dotnetDir -NoPath | Out-Null
 }
 
-$env:PATH = 'C:\dotnet;' + $env:PATH
+$env:PATH = $dotnetDir + ';' + $env:PATH
+$env:DOTNET_ROOT = $dotnetDir
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
 
-# Makine genelindeki PATH'e de ekle: yoksa Korumali Alan'da acilan YENI
-# pencerelerde dotnet bulunamaz.
+# Makine genelinde de ayarla: yoksa hem yeni pencerelerde dotnet bulunamaz,
+# hem de yonetici olarak baslatilan uygulamalar calisma zamanini goremez.
 try {
     $makine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-    if ($makine -notlike '*C:\dotnet*') {
-        [Environment]::SetEnvironmentVariable('Path', 'C:\dotnet;' + $makine, 'Machine')
+    if ($makine -notlike "*$dotnetDir*") {
+        [Environment]::SetEnvironmentVariable('Path', $dotnetDir + ';' + $makine, 'Machine')
     }
+    [Environment]::SetEnvironmentVariable('DOTNET_ROOT', $dotnetDir, 'Machine')
 } catch {
-    Write-Warning 'Makine PATH ayarlanamadi; dotnet yalnizca BU pencerede kullanilabilir.'
+    Write-Warning 'Makine ortam degiskenleri ayarlanamadi; dotnet yalnizca BU pencerede kullanilabilir.'
 }
 
 Write-Host "[3/3] Testler kosuluyor..."
