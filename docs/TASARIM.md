@@ -199,7 +199,8 @@ gösterilir.
 - [x] `TahtaKilit.Service` — açılışta kilitleme, watchdog, takvim, doğrulama
 - [x] `TahtaKilit.Admin` — kurulum sihirbazı, eşleştirme karekodu, takvim, kayıtlar
 - [x] Kurulum betikleri (`tools/yayinla.ps1`, `kur.ps1`, `kaldir.ps1`)
-- [ ] **Windows 10 tahta üzerinde saha testi** ← sıradaki
+- [x] Windows 11'de uçtan uca deneme (kurulum → eşleştirme → kilit → açma)
+- [ ] **Windows 10 akıllı tahta üzerinde saha testi** ← sıradaki
 - [ ] İmzalı MSI paketi
 
 ### Uygulama sırasında eklenen kararlar

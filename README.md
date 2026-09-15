@@ -23,11 +23,14 @@ Kararların tamamı ve mimari: **[docs/TASARIM.md](docs/TASARIM.md)**
 | Windows tutkalı | `src/TahtaKilit.Windows` | ✅ Yazıldı, derleniyor |
 | Windows servisi | `src/TahtaKilit.Service` | ✅ Yazıldı, derleniyor |
 | Kilit ekranı (WPF) | `src/TahtaKilit.Lock` | ✅ Yazıldı, derleniyor |
-| Kurulum sihirbazı (WPF) | `src/TahtaKilit.Admin` | ✅ Yazıldı, derleniyor |
+| Kurulum sihirbazı (WPF) | `src/TahtaKilit.Admin` | ✅ Çalışıyor |
 
-**Henüz gerçek bir Windows makinede çalıştırılmadı.** Derleniyor ve mantığı
-test ediliyor, ama kilit ekranı, servis ve P/Invoke çağrıları sahada
-denenmedi.
+Windows 11'de (Korumalı Alan içinde) uçtan uca denendi: kurulum, telefonla
+eşleştirme, kilit ekranı ve tek kullanımlık şifreyle açma çalışıyor.
+
+**Henüz denenmemiş olanlar:** açılışta kilitlenme, servis kurulumu ve
+watchdog, ders saati takvimi, boşta kalma kilidi, çoklu monitör, kaçış
+tuşlarının gerçekten engellenmesi ve gerçek bir akıllı tahta.
 
 ## Telefon uygulaması
 

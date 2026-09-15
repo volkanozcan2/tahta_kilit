@@ -28,8 +28,6 @@ internal sealed class LockAgent : IDisposable
     private GlobalHotkey? _hotkey;
     private LockScreenWindow? _screen;
     private KeyboardBlocker? _blocker;
-    private object? _previousTaskManagerPolicy;
-    private bool _policyApplied;
     private bool _locked;
     private bool _busy;
     private int _idleLockMinutes;
@@ -37,6 +35,13 @@ internal sealed class LockAgent : IDisposable
 
     public void Start()
     {
+        // Onceki calisma duzgun kapanamadiysa (oturum kapatma, zorla
+        // sonlandirma) Gorev Yoneticisi kapali kalmis olabilir; once onu temizle.
+        TaskManagerPolicy.Restore();
+
+        // Surec beklenmedik sekilde biterse de politikayi geri almayi dene.
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => TaskManagerPolicy.Restore();
+
         CreateMessageWindow();
 
         _timer.Tick += async (_, _) => await TickAsync();
@@ -259,12 +264,7 @@ internal sealed class LockAgent : IDisposable
     private void ApplyProtections()
     {
         _blocker ??= new KeyboardBlocker();
-
-        if (!_policyApplied)
-        {
-            _previousTaskManagerPolicy = TaskManagerPolicy.Disable();
-            _policyApplied = true;
-        }
+        TaskManagerPolicy.Disable();
     }
 
     private void RemoveProtections()
@@ -272,11 +272,7 @@ internal sealed class LockAgent : IDisposable
         _blocker?.Dispose();
         _blocker = null;
 
-        if (!_policyApplied)
-            return;
-
-        TaskManagerPolicy.Restore(_previousTaskManagerPolicy);
-        _policyApplied = false;
+        TaskManagerPolicy.Restore();
     }
 
     public void Dispose()
