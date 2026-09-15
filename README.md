@@ -53,6 +53,11 @@ powershell -ExecutionPolicy Bypass -File tools\yayinla.ps1   # derle ve topla
 powershell -ExecutionPolicy Bypass -File tools\kur.ps1       # kur ve sihirbazı aç
 ```
 
+Kurmadan denemek için: `tools\sihirbaz.ps1` (kurulum sihirbazı) ve
+`tools\dene.ps1` (kilit ekranı). Windows 11'in Akıllı Uygulama Denetimi
+imzasız programları engelliyorsa `tools\sandbox-ac.ps1` ile Korumalı Alan'da
+dene — orada bu kısıtlama yok ve pencere kapanınca iz kalmaz.
+
 Sihirbaz tahtaya bir ad ve kurulum PIN'i sorar, ardından eşleştirme karekodunu
 gösterir. **Kurulumu bitirmeden önce telefonunla o karekodu okut** — tahtayı
 açabilecek tek şey o.

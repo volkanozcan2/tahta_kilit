@@ -32,7 +32,7 @@ Write-Host ""
 Write-Host "=== Hazir ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "Sirasiyla:" -ForegroundColor Cyan
-Write-Host "  1) dotnet run --project src\TahtaKilit.Admin"
+Write-Host "  1) powershell -ExecutionPolicy Bypass -File tools\sihirbaz.ps1"
 Write-Host "     Tahta adi ve kurulum PIN'i gir, karekod cikinca telefonla okut."
 Write-Host ""
 Write-Host "  2) powershell -ExecutionPolicy Bypass -File tools\dene.ps1"
