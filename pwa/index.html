@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101418">
+  <title>Tahta Kilit</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- 1. PIN ekrani -->
+<section id="view-pin" class="view" hidden>
+  <div class="pad">
+    <h1 class="brand">Tahta Kilit</h1>
+    <p id="pin-aciklama" class="hint"></p>
+    <form id="pin-form" autocomplete="off">
+      <input id="pin-input" class="pin" type="password" inputmode="numeric"
+             pattern="[0-9]*" minlength="4" maxlength="12" placeholder="••••" required>
+      <input id="pin-input2" class="pin" type="password" inputmode="numeric"
+             pattern="[0-9]*" minlength="4" maxlength="12" placeholder="Tekrar" hidden>
+      <p id="pin-hata" class="hata" role="alert" hidden></p>
+      <button class="btn birincil" type="submit">Devam</button>
+    </form>
+  </div>
+</section>
+
+<!-- 2. Ana ekran -->
+<section id="view-home" class="view" hidden>
+  <header class="ust">
+    <h1 class="brand">Tahta Kilit</h1>
+    <button id="ayarlar-ac" class="ikon" type="button" aria-label="Ayarlar">⚙</button>
+  </header>
+  <div class="pad">
+    <div id="tahta-yok" class="bos" hidden>
+      <p>Henüz eşleşmiş tahta yok.</p>
+      <p class="hint">Tahtadaki kurulum ekranında çıkan eşleştirme karekodunu okutarak başla.</p>
+      <button id="ilk-esle" class="btn birincil" type="button">Tahta ekle</button>
+    </div>
+    <div id="tahta-var" hidden>
+      <button id="ac-btn" class="btn kocaman" type="button">Tahta aç</button>
+      <p class="hint orta">Tahtadaki karekodu okut</p>
+      <button id="elle-btn" class="btn sade" type="button">Kamera çalışmıyor mu? Kodu elle gir</button>
+      <h2 class="baslik">Tahtalarım</h2>
+      <ul id="tahta-listesi" class="liste"></ul>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Kamera -->
+<section id="view-scan" class="view kamera" hidden>
+  <video id="kamera" playsinline muted></video>
+  <canvas id="tuval" hidden></canvas>
+  <div class="hedef"></div>
+  <div class="kamera-alt">
+    <p id="scan-aciklama" class="kamera-yazi"></p>
+    <p id="scan-hata" class="hata" role="alert" hidden></p>
+    <button id="scan-elle" class="btn sade acik" type="button">Kodu elle gir</button>
+    <button id="scan-iptal" class="btn sade acik" type="button">Vazgeç</button>
+  </div>
+</section>
+
+<!-- 4. Elle kod girme -->
+<section id="view-manual" class="view" hidden>
+  <header class="ust">
+    <button class="ikon" type="button" data-geri>‹</button>
+    <h1 class="brand">Kodu elle gir</h1>
+  </header>
+  <div class="pad">
+    <form id="manual-form" autocomplete="off">
+      <label class="etiket" for="manual-tahta">Hangi tahta?</label>
+      <select id="manual-tahta" class="secim"></select>
+
+      <label class="etiket" for="manual-kod">Tahtadaki 6 haneli kod</label>
+      <input id="manual-kod" class="kod" type="text" inputmode="text"
+             autocapitalize="characters" spellcheck="false"
+             maxlength="9" placeholder="4F7K2Q" required>
+
+      <p id="manual-hata" class="hata" role="alert" hidden></p>
+      <button class="btn birincil" type="submit">Şifreyi üret</button>
+    </form>
+  </div>
+</section>
+
+<!-- 5. Sonuc -->
+<section id="view-result" class="view" hidden>
+  <div class="pad orta-dikey">
+    <p id="sonuc-tahta" class="hint orta"></p>
+    <p class="hint orta">Bu şifreyi tahtaya gir</p>
+    <p id="sonuc-kod" class="sifre"></p>
+    <p class="hint orta kucuk">Şifre yalnızca bu karekod için geçerli.
+      Tahta yeni kod gösterirse baştan okut.</p>
+    <button id="sonuc-bitti" class="btn birincil" type="button">Bitti</button>
+  </div>
+</section>
+
+<!-- 6. Ayarlar -->
+<section id="view-settings" class="view" hidden>
+  <header class="ust">
+    <button class="ikon" type="button" data-geri>‹</button>
+    <h1 class="brand">Ayarlar</h1>
+  </header>
+  <div class="pad">
+    <button id="tahta-ekle" class="btn birincil" type="button">Yeni tahta ekle</button>
+    <p class="hint">Tahtanın kurulum ekranındaki eşleştirme karekodunu okut.</p>
+
+    <h2 class="baslik">Eşleşmiş tahtalar</h2>
+    <ul id="ayar-listesi" class="liste"></ul>
+
+    <h2 class="baslik">Güvenlik</h2>
+    <button id="pin-degistir" class="btn sade" type="button">Uygulama PIN'ini değiştir</button>
+  </div>
+</section>
+
+<script src="vendor/jsQR.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

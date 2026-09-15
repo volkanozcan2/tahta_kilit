@@ -1,0 +1,15 @@
+{
+  "name": "tahta-kilit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test pwa/test/*.test.mjs",
+    "test:core": "node --test pwa/test/core.test.mjs",
+    "test:ui": "node --test pwa/test/ui.test.mjs",
+    "vectors": "node spec/generate-vectors.mjs",
+    "serve": "node tools/serve.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}

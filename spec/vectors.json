@@ -1,0 +1,48 @@
+{
+  "version": "TK1",
+  "aciklama": "Tahta Kilit cagri-cevap test vektorleri. spec/generate-vectors.mjs ile uretilir.",
+  "cases": [
+    {
+      "note": "temel durum",
+      "key": "JTA7RlFcZ3J9iJOeqbS_ytXg6_YBDBciLThDTllkb3o",
+      "boardId": "ABCDEFGH",
+      "challenge": "4F7K2Q",
+      "response": "42630448"
+    },
+    {
+      "note": "en kucuk degerler",
+      "key": "SlVga3aBjJeirbjDztnk7_oFEBsmMTxHUl1oc36JlJ8",
+      "boardId": "00000000",
+      "challenge": "000000",
+      "response": "51268846"
+    },
+    {
+      "note": "en buyuk degerler",
+      "key": "b3qFkJumsbzH0t3o8_4JFB8qNUBLVmFsd4KNmKOuucQ",
+      "boardId": "ZZZZZZZZ",
+      "challenge": "ZZZZZZ",
+      "response": "49915114"
+    },
+    {
+      "note": "karisik",
+      "key": "lJ-qtcDL1uHs9wINGCMuOURPWmVwe4aRnKeyvcjT3uk",
+      "boardId": "TK3M9WP2",
+      "challenge": "H8N4TV",
+      "response": "08527634"
+    },
+    {
+      "note": "karisik",
+      "key": "ucTP2uXw-wYRHCcyPUhTXml0f4qVoKu2wczX4u34Aw4",
+      "boardId": "QRSTVWXY",
+      "challenge": "9BCDFG",
+      "response": "56669646"
+    },
+    {
+      "note": "cevap sifirla basliyor (dolgulama testi)",
+      "key": "3un0_woVICs2QUxXYm14g46ZpK-6xdDb5vH8BxIdKDM",
+      "boardId": "ZEROPAD1",
+      "challenge": "000002",
+      "response": "04899920"
+    }
+  ]
+}
