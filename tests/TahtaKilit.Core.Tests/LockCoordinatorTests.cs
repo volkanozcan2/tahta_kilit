@@ -184,3 +184,24 @@ public class LockCoordinatorTests
         Assert.Null(LockMessages.ParseStatus("bu json degil"));
     }
 }
+
+public class LockStatusTests
+{
+    [Fact]
+    public void Bosta_kalma_suresi_kilit_ajanina_bildirilir()
+    {
+        // Ajan yapilandirmayi okuyamaz (dosya SYSTEM'e kapali); bu degeri
+        // yalnizca servisten ogrenebilir.
+        var config = new BoardConfig
+        {
+            BoardId = "ABCDEFGH",
+            BoardName = "Z-Blok 204",
+            Key = Base64Url.Encode(UnlockProtocol.NewKey()),
+            IdleLockMinutes = 15,
+        };
+
+        var durum = new LockCoordinator(config).Handle(new LockRequest(LockRequest.Durum));
+
+        Assert.Equal(15, durum.IdleLockMinutes);
+    }
+}

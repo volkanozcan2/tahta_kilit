@@ -23,7 +23,8 @@ public sealed record LockStatus(
     [property: JsonPropertyName("cagri")] string Challenge,
     [property: JsonPropertyName("qr")] string ChallengeQr,
     [property: JsonPropertyName("beklemeSn")] int WaitSeconds,
-    [property: JsonPropertyName("kalanHak")] int AttemptsLeft)
+    [property: JsonPropertyName("kalanHak")] int AttemptsLeft,
+    [property: JsonPropertyName("bostaDk")] int IdleLockMinutes = 0)
 {
     public const string Kilitli = "kilitli";
     public const string Acildi = "acildi";
@@ -42,6 +43,7 @@ public sealed class LockCoordinator
 {
     private readonly LockGuard _guard;
     private readonly string _boardName;
+    private readonly int _idleLockMinutes;
     private readonly Action<int>? _onTierChanged;
 
     private int _lastTier;
@@ -55,6 +57,7 @@ public sealed class LockCoordinator
         ArgumentNullException.ThrowIfNull(config);
 
         _boardName = config.BoardName;
+        _idleLockMinutes = config.IdleLockMinutes;
         _onTierChanged = onTierChanged;
         _guard = new LockGuard(config.DecodeKey(), config.BoardId, config.Tier, clock);
         _lastTier = _guard.Tier;
@@ -124,7 +127,10 @@ public sealed class LockCoordinator
         _guard.CurrentChallenge,
         _guard.CurrentChallengeQr,
         (int)Math.Ceiling((sonuc?.Wait ?? _guard.RemainingWait).TotalSeconds),
-        sonuc?.AttemptsLeft ?? LockGuard.AttemptsPerRound);
+        sonuc?.AttemptsLeft ?? LockGuard.AttemptsPerRound,
+        // Kilit ajani yapilandirmayi okuyamaz (dosya SYSTEM'e kapali),
+        // bosta kalma suresini servisten ogrenir.
+        _idleLockMinutes);
 }
 
 /// <summary>Kilit ekrani ile servis arasindaki mesajlarin JSON bicimi.</summary>

@@ -26,6 +26,7 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
     private LockCoordinator? _coordinator;
     private int? _agentPid;
     private DateTime _lastClockSave = DateTime.MinValue;
+    private DateTime _configStamp;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -37,6 +38,7 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
 
         logger.LogInformation("Tahta: {Ad} ({Kimlik})", _config.BoardName, _config.BoardId);
 
+        _configStamp = ConfigStamp();
         _coordinator = new LockCoordinator(_config, onTierChanged: PersistTier);
 
         using var pipe = new LockPipeServer(HandleRequest);
@@ -103,6 +105,7 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
         {
             try
             {
+                ReloadConfigIfChanged();
                 EnsureAgentRunning();
                 ApplySchedule();
                 SaveClock();
@@ -114,6 +117,44 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
             }
 
             await Task.Delay(WatchdogInterval, stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    private DateTime ConfigStamp() =>
+        File.Exists(_store.Path) ? File.GetLastWriteTimeUtc(_store.Path) : DateTime.MinValue;
+
+    /// <summary>
+    /// Kurulum sihirbazi ayarlari degistirdiginde servisin yeniden
+    /// baslatilmasi gerekmesin diye dosya degisimi izlenir.
+    /// </summary>
+    private void ReloadConfigIfChanged()
+    {
+        var stamp = ConfigStamp();
+        if (stamp == _configStamp)
+            return;
+
+        _configStamp = stamp;
+
+        if (_store.Load() is not { } yeni)
+        {
+            logger.LogWarning("Yapilandirma degismis ama okunamadi; eski ayarlar kullanilmaya devam ediyor.");
+            return;
+        }
+
+        // Anahtar veya kimlik degistiyse tahta yeniden eslestirilmis demektir;
+        // dogrulayici bastan kurulur ve tahta kilitli duruma doner.
+        var yenidenEslesme = yeni.BoardId != _config!.BoardId || yeni.Key != _config.Key;
+
+        _config = yeni;
+
+        if (yenidenEslesme)
+        {
+            logger.LogInformation("Tahta yeniden eslestirildi; kilit sifirlaniyor.");
+            _coordinator = new LockCoordinator(_config, onTierChanged: PersistTier);
+        }
+        else
+        {
+            logger.LogInformation("Ayarlar guncellendi.");
         }
     }
 
@@ -216,6 +257,9 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
         try
         {
             _store.Save(_config!);
+
+            // Kendi yazdigimiz degisiklik "disaridan degisti" sayilmamali.
+            _configStamp = ConfigStamp();
         }
         catch (Exception e)
         {

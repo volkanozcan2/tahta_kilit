@@ -1,0 +1,13 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      WPF projeleri normalde yalnizca Windows'ta derlenir. Bu ayar, Windows
+      disindaki makinelerde (macOS, Linux) de derlenmelerini saglar:
+      calistirilamazlar ama derleyici denetimi ve testler kaybolmaz.
+      Windows'ta gereksizdir, o yuzden kosullu.
+    -->
+    <EnableWindowsTargeting Condition="'$(OS)' != 'Windows_NT'">true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+</Project>

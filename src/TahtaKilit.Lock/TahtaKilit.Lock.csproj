@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AssemblyName>TahtaKilit.Lock</AssemblyName>
+    <RootNamespace>TahtaKilit.Lock</RootNamespace>
+
+    <!-- Arayuz XAML yerine dogrudan C# ile kuruluyor; App.xaml yok. -->
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TahtaKilit.Core\TahtaKilit.Core.csproj" />
+    <ProjectReference Include="..\TahtaKilit.Windows\TahtaKilit.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

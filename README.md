@@ -18,21 +18,54 @@ Kararların tamamı ve mimari: **[docs/TASARIM.md](docs/TASARIM.md)**
 
 | Parça | Klasör | Durum |
 |---|---|---|
-| Protokol çekirdeği (C#) | `src/TahtaKilit.Core` | ✅ Hazır, testli |
-| Telefon uygulaması (PWA) | `pwa/` | ✅ Çalışıyor (eşleştirme, karekod okuma, elle kod, şifre üretimi, çevrimdışı) |
-| Kilit ekranı (WPF) | `src/TahtaKilit.Lock` | ⏳ Yapılacak |
-| Windows servisi | `src/TahtaKilit.Service` | ⏳ Yapılacak |
-| Kurulum sihirbazı | `src/TahtaKilit.Admin` | ⏳ Yapılacak |
+| Protokol çekirdeği | `src/TahtaKilit.Core` | ✅ Hazır, testli |
+| Telefon uygulaması (PWA) | `pwa/` | ✅ Çalışıyor, testli |
+| Windows tutkalı | `src/TahtaKilit.Windows` | ✅ Yazıldı, derleniyor |
+| Windows servisi | `src/TahtaKilit.Service` | ✅ Yazıldı, derleniyor |
+| Kilit ekranı (WPF) | `src/TahtaKilit.Lock` | ✅ Yazıldı, derleniyor |
+| Kurulum sihirbazı (WPF) | `src/TahtaKilit.Admin` | ✅ Yazıldı, derleniyor |
+
+**Henüz gerçek bir Windows makinede çalıştırılmadı.** Derleniyor ve mantığı
+test ediliyor, ama kilit ekranı, servis ve P/Invoke çağrıları sahada
+denenmedi.
+
+## Tahtaya kurmak
+
+> **Önce sanal makinede dene.** Kurulumdan sonra tahta yalnızca eşleşmiş bir
+> telefonla açılır. Telefon eşleştirmeden kurarsan makinede kilitli kalırsın —
+> çıkış yolu aşağıdaki "Kilitli kaldıysan" bölümünde.
+
+Windows'ta, yönetici PowerShell'de:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\yayinla.ps1   # derle ve topla
+powershell -ExecutionPolicy Bypass -File tools\kur.ps1       # kur ve sihirbazı aç
+```
+
+Sihirbaz tahtaya bir ad ve kurulum PIN'i sorar, ardından eşleştirme karekodunu
+gösterir. **Kurulumu bitirmeden önce telefonunla o karekodu okut** — tahtayı
+açabilecek tek şey o.
+
+Kaldırmak için: `powershell -ExecutionPolicy Bypass -File tools\kaldir.ps1`
+
+### Kilitli kaldıysan
+
+Servis Güvenli Mod'da başlamaz. Windows'u Güvenli Mod'da açıp
+`tools\kaldir.ps1` çalıştırarak kilidi kaldırabilirsin. Bu aynı zamanda
+sistemin bilinen sınırıdır: Güvenli Mod'a girebilen biri kilidi aşabilir
+(bkz. [docs/TASARIM.md](docs/TASARIM.md)).
 
 ## Geliştirme
 
-`Core` ve PWA **platformdan bağımsızdır** — macOS ve Linux'ta da derlenip
-test edilir. Yalnızca `Lock`, `Service` ve `Admin` Windows gerektirir.
+Proje **macOS ve Linux'ta da derlenir.** WPF projeleri dahil her şey derlenip
+testler koşulabilir (`Directory.Build.props` içindeki `EnableWindowsTargeting`
+sayesinde); yalnızca *çalıştırmak* Windows gerektirir.
 
 Gerekenler: [.NET 8 SDK](https://dotnet.microsoft.com/download) ve Node.js 20+.
 
 ```bash
-# C# çekirdeği ve testleri
+# Tüm projeler ve testler (macOS/Linux'ta da çalışır)
+dotnet build
 dotnet test
 
 # Telefon uygulaması testleri

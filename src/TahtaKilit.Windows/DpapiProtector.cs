@@ -9,9 +9,11 @@ namespace TahtaKilit.Windows;
 /// Makine kapsami kullanilir: dosya baska bir bilgisayara kopyalanirsa
 /// cozulemez.
 ///
-/// Durust sinir: tahtada yonetici yetkisi olan biri ayni makinede calisip
-/// veriyi cozebilir. Koruma, yetkisiz <em>kullanima</em> karsidir; makineye
-/// yonetici olarak erisen birine karsi degil.
+/// Durust sinir: makine kapsami, <em>ayni makinedeki</em> herhangi bir
+/// kullanicinin cozebilecegi anlamina gelir. Asil bariyer dosya izinleridir
+/// (bkz. <see cref="DataDirectorySecurity"/>): klasor yalnizca SYSTEM ve
+/// Administrators tarafindan okunabilir. DPAPI, dosyanin baska makineye
+/// tasinmasina ve yedeklerden okunmasina karsi ikinci katmandir.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class DpapiProtector : IDataProtector

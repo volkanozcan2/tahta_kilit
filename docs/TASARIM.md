@@ -193,14 +193,37 @@ gösterilir.
 
 ## 8. İlk sürüm kapsamı (MVP)
 
-Yapılacaklar:
-- [ ] Ortak kripto kütüphanesi (challenge/response üretimi ve doğrulaması)
-- [ ] `TahtaKilit.Lock` — kilit ekranı, QR gösterimi, kod girişi, klavye kancası
-- [ ] `TahtaKilit.Service` — açılışta kilitleme, watchdog, oturum takibi
-- [ ] `TahtaKilit.Admin` — kurulum sihirbazı, eşleştirme QR'ı, takvim, loglar
-- [ ] PWA — eşleştirme, QR okuma, elle kod, cevap üretimi, çevrimdışı çalışma
-- [ ] MSI/EXE kurulum paketi
-- [ ] Windows 10 tahta üzerinde saha testi
+- [x] Ortak kripto kütüphanesi (çağrı/cevap üretimi ve doğrulaması)
+- [x] PWA — eşleştirme, karekod okuma, elle kod, cevap üretimi, çevrimdışı çalışma
+- [x] `TahtaKilit.Lock` — kilit ekranı, karekod gösterimi, kod girişi, klavye kancası
+- [x] `TahtaKilit.Service` — açılışta kilitleme, watchdog, takvim, doğrulama
+- [x] `TahtaKilit.Admin` — kurulum sihirbazı, eşleştirme karekodu, takvim, kayıtlar
+- [x] Kurulum betikleri (`tools/yayinla.ps1`, `kur.ps1`, `kaldir.ps1`)
+- [ ] **Windows 10 tahta üzerinde saha testi** ← sıradaki
+- [ ] İmzalı MSI paketi
+
+### Uygulama sırasında eklenen kararlar
+
+**Anahtar kilit ekranında durmaz.** Doğrulama SYSTEM olarak çalışan serviste
+yapılır; kilit ekranı adlandırılmış boru üzerinden yalnızca girilen yazıyı
+gönderip `açıldı / yanlış / bekle` cevabını alır. Böylece öğrenci
+oturumundaki hiçbir süreçte gizli anahtar bulunmaz.
+
+**Asıl koruma dosya izinleri.** DPAPI'nin makine kapsamı aynı makinedeki her
+kullanıcı tarafından çözülebilir. Bu yüzden `C:\ProgramData\TahtaKilit`
+klasörü kurulumda yalnızca SYSTEM ve Administrators'a açılır; Admin ekranı
+izinler bozuksa uyarı gösterir ve düzeltme sunar.
+
+**Bekleme cezası yeniden başlatmayla sıfırlanmaz.** Ceza kademesi diske
+yazılır, süre ölçümü sistem saati yerine açılıştan beri geçen süreyle yapılır.
+
+**Sekiz hane tamamlanınca kendiliğinden gönderilir.** Tahta dokunmatik
+olduğu için ekran tuş takımı var; ayrıca bir "onayla" tuşuna basmak fazladan
+adım olurdu. Klavye girişi de kabul edilir.
+
+**Arayüzler XAML yerine C# ile kuruldu.** Tek dosyada, derleyici denetiminde
+ve XAML üretimi/kod arkası bağlantısı olmadan. `EnableWindowsTargeting`
+sayesinde WPF projeleri Windows dışında da derlenir.
 
 İlk sürüm dışında bırakılanlar (ileride):
 - Bulut panel, merkezi log, uzaktan kilitleme
