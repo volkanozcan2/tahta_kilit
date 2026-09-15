@@ -15,10 +15,27 @@ Write-Host "[1/3] Proje kopyalaniyor..."
 robocopy C:\kaynak $hedef /E /XD bin obj node_modules yayin .git /NFL /NDL /NJH /NJS /NC /NS | Out-Null
 $global:LASTEXITCODE = 0  # robocopy basarida da sifir disi kod dondurur
 
-Write-Host "[2/3] .NET 8 SDK kuruluyor (birkac dakika surebilir)..."
-$betik = Join-Path $env:TEMP 'dotnet-install.ps1'
-Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $betik -UseBasicParsing
-& $betik -Channel 8.0 -InstallDir 'C:\dotnet' -NoPath | Out-Null
+# Betik iki kez calisabiliyor (Korumali Alan acilista kendisi baslatiyor).
+# Ikinci kurulum, calisan dotnet.exe'yi ustune yazmaya calisip patliyordu.
+$dotnetExe = 'C:\dotnet\dotnet.exe'
+$kurulu = $false
+if (Test-Path $dotnetExe) {
+    try {
+        $null = & $dotnetExe --version 2>$null
+        $kurulu = ($LASTEXITCODE -eq 0)
+    } catch {
+        $kurulu = $false
+    }
+}
+
+if ($kurulu) {
+    Write-Host "[2/3] .NET zaten kurulu, atlaniyor."
+} else {
+    Write-Host "[2/3] .NET 8 SDK kuruluyor (birkac dakika surebilir)..."
+    $betik = Join-Path $env:TEMP 'dotnet-install.ps1'
+    Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $betik -UseBasicParsing
+    & $betik -Channel 8.0 -InstallDir 'C:\dotnet' -NoPath | Out-Null
+}
 
 $env:PATH = 'C:\dotnet;' + $env:PATH
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
