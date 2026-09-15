@@ -52,16 +52,6 @@ internal static class Theme
         MaxLength = maxLength,
     };
 
-    public static PasswordBox Sifre() => new()
-    {
-        FontSize = 16,
-        Padding = new Thickness(10, 8, 10, 8),
-        Background = Kart,
-        Foreground = Yazi,
-        BorderThickness = new Thickness(0),
-        MaxLength = 32,
-    };
-
     public static Button Dugme(string caption, bool birincil = false)
     {
         return new Button

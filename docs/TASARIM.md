@@ -1,9 +1,7 @@
 # Tahta Kilit — Tasarım Kararları
 
-Windows 10 akıllı tahtaları kilitleyen, yalnızca öğretmenin telefonundaki
-uygulamadan üretilen tek kullanımlık şifreyle açılan sistem.
-
-Bu belge, uygulamaya başlamadan önce verilen kararların kaydıdır.
+Windows 10/11 akıllı tahtaları kilitleyen, telefondaki uygulamadan üretilen
+şifreyle açılan sistem.
 
 ---
 
@@ -12,225 +10,180 @@ Bu belge, uygulamaya başlamadan önce verilen kararların kaydıdır.
 | Konu | Karar |
 |---|---|
 | Kilit yöntemi | Kiosk overlay (tam ekran, her zaman üstte) + Windows servisi watchdog |
-| Şifre modeli | Çağrı–cevap (challenge–response), HMAC-SHA256 — **saatten ve internetten bağımsız** |
-| Şifre giriş yolu | Tahtadaki QR'ı telefonla okut **veya** 6 haneli çağrı kodunu telefona elle gir |
+| Açma kuralı | Ekrandaki 12 haneli sayının iki yarısının XOR'u |
+| Gizli anahtar | **Yok** (bilinçli tercih — bkz. 2. bölüm) |
+| Kod ömrü | 30 saniye |
 | Sunucu | Yok. Her şey tahtada ve telefonda yerel |
 | Mobil taraf | PWA (telefona kurulabilen web uygulaması), çevrimdışı çalışır |
-| Kilitlenme anı | Her Windows açılışında + ders saati takvimine göre |
-| Eşleştirme | Bir telefon birden çok tahtayı açabilir; her tahtanın kendi anahtarı var |
-| Kurulum | Yönetici kurulum sihirbazı (MSI/EXE), kurulum PIN'i ile korunur |
+| Kurulum | Yalnızca tahtanın adı sorulur |
+| Kilitlenme anı | Her açılışta + ders saati takvimine göre + boşta kalınca |
 
 ---
 
-## 2. Neden TOTP değil?
+## 2. Güvenlik modeli — önce bu okunmalı
 
-İlk akla gelen çözüm Google Authenticator tarzı TOTP'dir, ancak sahadaki iki
-gerçek bunu eliyor:
+**Bu sistem gizli anahtar kullanmaz.** Kilidi açan sayı, kilidin kendi
+ekranında gösterilen sayıdan hesaplanır. Kuralı bilen herkes — bir hesap
+makinesiyle, ya da bu depodaki telefon uygulamasını açarak — aynı sonucu
+bulabilir.
 
-- **Tahtaların saati kayıyor.** TOTP 30 saniyelik zaman dilimlerine dayanır;
-  tahtanın saati birkaç dakika şaşarsa doğru kod bile reddedilir.
-- **İnternet kopuyor.** Saat sunucudan (NTP) düzeltilemiyor, merkezi
-  doğrulama da yapılamıyor.
+Yani bu bir güvenlik önlemi **değildir.** Şunu yapar:
 
-Bunun yerine **çağrı–cevap** kullanıyoruz: zaman hiç denkleme girmez.
+- Tahtayı düşünmeden veya yanlışlıkla kullanmayı engeller
+- "Bu tahta kilitli, kullanman beklenmiyor" mesajını açıkça verir
+- Öğretmene tek dokunuşla açma yolu bırakır
 
-### Akış
+Şunu **yapmaz:**
+
+- Kuralı öğrenen bir öğrenciyi durdurmaz
+- Telefon uygulamasını bulan birini durdurmaz (uygulama herkese açık bir
+  adreste yayınlanır ve içinde tahtaya özel hiçbir bilgi yoktur)
+
+Bu, projeyi yürüten kişinin bilinçli tercihidir: kurulumun basit olması
+(tahta başına eşleştirme yok, öğretmen telefonunda hesap yok) gerçek bir
+kilide tercih edilmiştir.
+
+### Gerçek koruma gerekirse
+
+Önceki sürümde HMAC-SHA256 tabanlı, tahta başına gizli anahtarlı bir çağrı–cevap
+şeması vardı; öğretmen telefonu kurulumda karekodla eşleşiyordu. O şema
+kuralı bilen birine karşı da koruma sağlıyordu ve git geçmişinde duruyor
+(`src/TahtaKilit.Core/UnlockProtocol.cs`). Kurulum kolaylığından ödün vermeden
+güvenlik isteniyorsa ara yol, okul geneli tek anahtardır: tahta kurulumu yine
+"isim gir, geç" olur, öğretmen telefonu ise hayatında bir kez eşleşir.
+
+---
+
+## 3. Açma kuralı
 
 ```
-   TAHTA (kilitli)                        TELEFON (PWA)
-   ──────────────                         ─────────────
-1. Rastgele çağrı üretir  C
+   TAHTA (kilitli)                         TELEFON
+   ──────────────                          ───────
+1. 12 haneli rastgele sayı üretir
+   (30 saniyede bir yenilenir)
    Ekranda gösterir:
      ┌─────────────┐
-     │   [ QR ]    │   ──── QR okut ────►  2. QR'dan tahta kimliği + C okunur
-     │             │        (veya)            (kamera yoksa: 6 haneli kod elle)
-     │  4F7K-2Q    │
-     └─────────────┘                      3. O tahtanın anahtarı K ile:
-                                             cevap = HMAC-SHA256(K, id‖C)
-                                             → 8 haneli sayı
-
-5. Aynı hesabı kendi de yapar,      ◄──── 4. Ekranda: 40 82 17 55
+     │   [ QR ]    │  ─── QR okut ────►  2. Sayıyı okur: 123456 654321
+     │             │      (veya)            (kamera yoksa elle yazılır)
+     │ 1234 5665   │
+     │ 4321        │                     3. İki yarıyı XOR'lar:
+     └─────────────┘                        123456 ^ 654321 = 530865
+                                            → 0530865
+5. Aynı hesabı kendi de yapar,     ◄──── 4. Ekranda: 053 0865
    eşleşiyorsa kilidi açar                    (öğretmen tahtaya yazar)
-   ve C'yi "kullanıldı" işaretler
 ```
 
-**Özellikler**
+**Ayrıntılar**
 
-- Saat hiçbir adımda kullanılmaz → saat kayması sorunu ortadan kalkar.
-- İnternet hiçbir adımda kullanılmaz → tahta ve telefon tamamen çevrimdışı.
-- Her açılışta çağrı `C` yeniden üretilir → aynı kod ikinci kez işe yaramaz
-  (omuz üstünden kodu gören öğrenci sonra kullanamaz).
-- Telefon ile tahta arasında ağ bağlantısı gerekmez; köprü insanın gözü ve eli.
-
----
-
-## 3. Kriptografi ayrıntıları
-
-**Eşleştirme (bir kez, kurulumda)**
-- Tahta 256 bit rastgele anahtar `K` üretir (`RNGCryptoServiceProvider`).
-- Eşleştirme QR'ı: `{"v":1,"id":"<tahta-id>","ad":"Z-Blok 204","k":"<base64url K>"}`
-- Telefon bu kaydı IndexedDB'ye yazar. Tahta anahtarı DPAPI ile şifreleyip
-  `C:\ProgramData\TahtaKilit\` altında saklar (ACL: SYSTEM + Administrators).
-
-**Kilit açma**
-- Çağrı `C`: 30 bit rastgele → Crockford Base32 ile 6 karakter (`4F7K2Q`).
-  Elle yazılabilecek kadar kısa, tahmin edilemeyecek kadar geniş
-  (yanlış deneme sınırı ile birlikte).
-- Cevap: `HMAC-SHA256(K, id ‖ ":" ‖ C)` → ilk 4 bayt → `mod 10^8` → 8 hane,
-  ekranda `40 82 17 55` biçiminde gruplanır.
-- Doğrulama sabit zamanlı karşılaştırma ile yapılır.
-- Kabul edilen çağrı "kullanıldı" olarak işaretlenir, yeni çağrı üretilir.
-
-**Yanlış deneme koruması**
-- 5 yanlış denemeden sonra artan bekleme (10 sn → 30 sn → 2 dk → 5 dk).
-- Bekleme süresi sistem saatine değil, açılıştan beri geçen süreye
-  (`Environment.TickCount64`) dayanır — saat ileri alınarak atlatılamaz.
-- Tüm denemeler yerel log dosyasına yazılır.
-
-**Dürüst sınır:** Tahtada yönetici yetkisi olan biri diski okuyarak `K`
-anahtarını çıkarabilir. Bu sistem, yetkisiz *kullanıma* karşı koruma sağlar;
-kararlı bir saldırgana veya donanıma fiziksel erişime karşı değil.
+- Sayı 12 hane, başta sıfır olabilir.
+- İki yarı 6 haneli tam sayı olarak okunur, bit düzeyinde XOR'lanır.
+- Sonuç en fazla 1048575 (2²⁰−1) olabilir, yani 7 hane. Kısa sonuçlar başa
+  sıfır konarak 7 haneye tamamlanır; ekranda hep aynı genişlikte görünür.
+- Kod 30 saniyede bir yenilenir. Ölçüm sistem saatiyle değil, açılıştan beri
+  geçen süreyle yapılır — tahtanın saati kaysa da çalışır.
+- Kilit açıldığında kod hemen yenilenir; tahta tekrar kilitlenince eski şifre
+  işe yaramaz.
+- Yanlış şifre girilirse kod **değişmez**; öğretmen yazım hatasını düzeltip
+  tekrar deneyebilir, karekodu yeniden okutması gerekmez.
 
 ---
 
 ## 4. Windows tarafı mimarisi
 
-Üç parça, .NET 8 (Windows 10 1809+ uyumlu, self-contained yayın):
+Üç parça, .NET 8:
 
 **`TahtaKilit.Service`** — Windows servisi, SYSTEM olarak çalışır
 - Açılışta kilit durumunu belirler (varsayılan: kilitli).
-- Kilit ekranını aktif oturuma başlatır (`CreateProcessAsUser` + `WTSGetActiveConsoleSessionId`).
+- Kilit ekranını aktif oturuma başlatır (`CreateProcessAsUser`).
 - Watchdog: kilit ekranı öldürülürse 1 saniye içinde yeniden başlatır.
-- Oturum değişimlerini dinler (kullanıcı değişimi, uzak masaüstü).
-- Ders saati takvimini uygular.
+- Ders saati takvimini uygular, yapılandırma değişince yeniden okur.
 
 **`TahtaKilit.Lock`** — WPF tam ekran kilit ekranı, kullanıcı oturumunda
-- Tüm ekranları kaplar (çoklu monitör), `Topmost`, görev çubuğu gizlenir.
-- QR + 6 haneli çağrı kodu + 8 haneli cevap giriş alanı (dokunmatik tuş takımı).
-- Düşük seviye klavye kancası (`WH_KEYBOARD_LL`) ile engellenenler:
-  `Win`, `Alt+Tab`, `Alt+F4`, `Ctrl+Esc`, `Ctrl+Shift+Esc`, `Alt+Esc`.
-- Ekranda okul/sınıf adı ve "BT'ye başvurun" bilgi metni.
+- Tüm ekranları kaplar (çoklu monitör), görev çubuğu gizlenir.
+- Karekod + 12 haneli sayı + 7 haneli şifre girişi (dokunmatik tuş takımı).
+- Düşük seviye klavye kancası ile `Win`, `Alt+Tab`, `Alt+F4`, `Ctrl+Esc`
+  engellenir.
+- `Ctrl+Alt+L` ile öğretmen çıkarken elle kilitleyebilir.
 
 **`TahtaKilit.Admin`** — kurulum sihirbazı ve yönetim aracı
-- İlk çalıştırmada: tahta adı, kurulum PIN'i belirleme, anahtar üretimi.
-- Eşleştirme QR'ını gösterir (yeni telefon eklemek her zaman PIN ister).
-- Ders saati takvimi düzenleme, boşta kalma süresi, log görüntüleme.
-- Kilidi kalıcı devre dışı bırakma / kaldırma (PIN ile).
+- İlk çalıştırmada yalnızca tahtanın adını sorar.
+- Ders saati takvimi, boşta kalma süresi, kayıtlar, kilidi kaldırma.
+
+Kilit durumu servistedir; kilit ekranı yalnızca girilen yazıyı iletip sonucu
+alır. Bu, kuralda sır olmadığı için güvenlik sağlamaz — ama kilit ekranı
+öldürülüp yeniden başlatıldığında kilidin açılmamasını sağlar.
 
 ### `Ctrl+Alt+Del` hakkında
 
 Secure Attention Sequence, çekirdek sürücüsü olmadan engellenemez. Alınan
 önlemler:
-- Kilitliyken Görev Yöneticisi politika ile kapatılır
-  (`DisableTaskMgr`), kilit açılınca eski haline döndürülür.
-- Kullanıcı yine de Windows'un kendi kilit ekranına düşebilir; oturuma geri
-  döndüğünde servis kilit ekranını hemen yeniden öne getirir.
-- Bu, kararlı bir kullanıcının Güvenli Mod ile aşabileceği bir korumadır;
-  hedef kitle (izinsiz kullanan öğrenci) için yeterlidir. Daha sıkı koruma
-  gerekirse ikinci aşamada shell replacement'a geçilebilir.
+- Kilitliyken Görev Yöneticisi politika ile kapatılır; kilit açılınca eski
+  haline döndürülür. Önceki değer kendi kayıt anahtarımızda saklanır, böylece
+  kilit ekranı zorla sonlandırılsa bile politika bir sonraki açılışta geri
+  alınır.
+- Kullanıcı Windows'un kendi kilit ekranına düşebilir; oturuma döndüğünde
+  servis kilit ekranını hemen yeniden öne getirir.
 
 ---
 
 ## 5. Ders saati takvimi ve saat kayması
 
-Takvim özelliği istendi, ancak tahtanın saati güvenilmez. Bu yüzden takvim
-**yalnızca kilitleme yönünde** çalışır:
+Takvim **yalnızca kilitleme yönünde** çalışır:
 
 - Takvim tahtayı kilitleyebilir, **asla kendi başına açamaz.**
-- Açmanın tek yolu her zaman telefondan gelen koddur.
+- Açmanın tek yolu her zaman ekrandaki koddan hesaplanan şifredir.
 
-Böylece saat şaşsa bile en kötü ihtimalle tahta beklenmedik anda kilitlenir —
-öğretmen telefonuyla saniyeler içinde açar. Ters durumda (saat yüzünden
-tahtanın kendiliğinden açık kalması) güvenlik açığı doğardı; bu tasarım onu
-imkânsız kılar.
+Saat şaşsa bile en kötü ihtimalle tahta beklenmedik anda kilitlenir —
+öğretmen saniyeler içinde açar. Ters durumda (saat yüzünden tahtanın
+kendiliğinden açık kalması) daha büyük sorun doğardı.
 
-Ek olarak Admin ekranında "Saat sapmış görünüyor" uyarısı gösterilir
-(son kapanış zamanından geriye gitmiş bir saat tespit edilirse).
+Servis en son gördüğü zamanı diske yazar; sistem saati bundan belirgin şekilde
+geriye gitmişse takvim geçici olarak işletilmez.
 
 **Kilitlenme tetikleri**
 1. Her Windows açılışında (varsayılan, kapatılamaz).
-2. Takvim dışı saatlerde (ör. 17:00–07:30 arası) — isteğe bağlı.
-3. Elle kilitleme kısayolu — öğretmen çıkarken.
+2. Takvim dışı saatlerde — isteğe bağlı.
+3. Boşta kalınca — isteğe bağlı.
+4. `Ctrl+Alt+L` — öğretmen çıkarken.
 
 ---
 
 ## 6. Telefon tarafı (PWA)
 
-Mağaza derdi olmayan, telefona "Ana ekrana ekle" ile kurulan web uygulaması.
-
-- **Teknoloji:** saf HTML/CSS/JS, çerçeve yok. `jsQR` ile kamera okuma,
-  WebCrypto (`crypto.subtle`) ile HMAC-SHA256.
-- **Çevrimdışı:** Service Worker tüm dosyaları önbelleğe alır. İlk kurulumdan
-  sonra internet gerekmez.
-- **Depolama:** tahta anahtarları IndexedDB'de. Uygulama açılışında ekran
-  kilidi/PIN istenir (uygulama içi PIN, anahtarlar PIN'den türetilen anahtarla
-  şifrelenir — telefon kaybolursa anahtarlar okunamaz).
-- **Ekranlar:**
-  1. Tahta listesi (eşleşmiş tahtalar, isimleriyle)
-  2. "Tahta Aç" → kamera açılır, QR okutulur
-  3. Kamera yoksa "Kodu elle gir" → 6 haneli çağrı kodu
-  4. Sonuç ekranı: büyük puntolarla 8 haneli cevap
-  5. Ayarlar: yeni tahta ekle (eşleştirme QR'ı okut), tahta sil, PIN değiştir
-- **Barındırma:** statik dosyalar; HTTPS şart (kamera erişimi ve PWA kurulumu
-  için). GitHub Pages veya Netlify yeterli. Sayfa yalnızca dağıtım içindir,
-  hiçbir veri sunucuya gitmez.
+- **Teknoloji:** saf HTML/CSS/JS. `jsQR` ile kamera okuma.
+- **Çevrimdışı:** Service Worker tüm dosyaları önbelleğe alır.
+- **Saklanan veri yok:** eşleştirme, hesap, anahtar, PIN yok. Uygulama
+  karekodu okur, XOR'u hesaplar, sonucu gösterir.
+- **Ekranlar:** ana ekran → kamera → sonuç. Kamera çalışmazsa 12 haneli sayı
+  elle girilebilir.
+- **Barındırma:** statik dosyalar, HTTPS şart (kamera erişimi ve PWA kurulumu
+  için).
 
 ---
 
 ## 7. Kurulum akışı
 
-1. BT sorumlusu tahtaya `TahtaKilit-Setup.exe` kurar (yönetici hakkı ister).
-2. Sihirbaz: tahta adı girilir → kurulum PIN'i belirlenir → anahtar üretilir.
-3. Ekranda eşleştirme QR'ı çıkar.
-4. Öğretmen telefonunda PWA'yı açar → "Yeni tahta ekle" → QR'ı okutur.
-5. Aynı QR birden çok öğretmene okutulabilir (o sınıfa giren herkes).
-6. Sihirbaz kapanır, tahta kilitlenir. Artık tek açma yolu telefondur.
+1. BT sorumlusu tahtaya kurulum yapar (yönetici hakkı ister).
+2. Sihirbaz tahtanın adını sorar. Başka hiçbir şey sormaz.
+3. "Kur" denince tahta kilitlenir.
+4. Öğretmen telefonunda PWA'yı açar, karekodu okutur, çıkan şifreyi girer.
 
-Sonradan yeni öğretmen eklemek: Admin aracı → kurulum PIN'i → QR yeniden
-gösterilir.
+Aynı telefon uygulaması bütün tahtalarda çalışır; tahtaya özel hiçbir kurulum
+gerekmez.
 
 ---
 
-## 8. İlk sürüm kapsamı (MVP)
+## 8. Durum
 
-- [x] Ortak kripto kütüphanesi (çağrı/cevap üretimi ve doğrulaması)
-- [x] PWA — eşleştirme, karekod okuma, elle kod, cevap üretimi, çevrimdışı çalışma
-- [x] `TahtaKilit.Lock` — kilit ekranı, karekod gösterimi, kod girişi, klavye kancası
-- [x] `TahtaKilit.Service` — açılışta kilitleme, watchdog, takvim, doğrulama
-- [x] `TahtaKilit.Admin` — kurulum sihirbazı, eşleştirme karekodu, takvim, kayıtlar
-- [x] Kurulum betikleri (`tools/yayinla.ps1`, `kur.ps1`, `kaldir.ps1`)
-- [x] Windows 11'de uçtan uca deneme (kurulum → eşleştirme → kilit → açma)
-- [ ] **Windows 10 akıllı tahta üzerinde saha testi** ← sıradaki
-- [ ] İmzalı MSI paketi
-
-### Uygulama sırasında eklenen kararlar
-
-**Anahtar kilit ekranında durmaz.** Doğrulama SYSTEM olarak çalışan serviste
-yapılır; kilit ekranı adlandırılmış boru üzerinden yalnızca girilen yazıyı
-gönderip `açıldı / yanlış / bekle` cevabını alır. Böylece öğrenci
-oturumundaki hiçbir süreçte gizli anahtar bulunmaz.
-
-**Asıl koruma dosya izinleri.** DPAPI'nin makine kapsamı aynı makinedeki her
-kullanıcı tarafından çözülebilir. Bu yüzden `C:\ProgramData\TahtaKilit`
-klasörü kurulumda yalnızca SYSTEM ve Administrators'a açılır; Admin ekranı
-izinler bozuksa uyarı gösterir ve düzeltme sunar.
-
-**Bekleme cezası yeniden başlatmayla sıfırlanmaz.** Ceza kademesi diske
-yazılır, süre ölçümü sistem saati yerine açılıştan beri geçen süreyle yapılır.
-
-**Sekiz hane tamamlanınca kendiliğinden gönderilir.** Tahta dokunmatik
-olduğu için ekran tuş takımı var; ayrıca bir "onayla" tuşuna basmak fazladan
-adım olurdu. Klavye girişi de kabul edilir.
-
-**Arayüzler XAML yerine C# ile kuruldu.** Tek dosyada, derleyici denetiminde
-ve XAML üretimi/kod arkası bağlantısı olmadan. `EnableWindowsTargeting`
-sayesinde WPF projeleri Windows dışında da derlenir.
-
-İlk sürüm dışında bırakılanlar (ileride):
-- Bulut panel, merkezi log, uzaktan kilitleme
-- Sessiz toplu kurulum parametreleri
-- Shell replacement ile sertleştirme
-- iOS/Android yerel uygulama
+- [x] Açma kuralı ve testleri
+- [x] PWA — karekod okuma, elle giriş, çevrimdışı çalışma
+- [x] `TahtaKilit.Lock` — kilit ekranı, klavye kancası
+- [x] `TahtaKilit.Service` — açılışta kilitleme, watchdog, takvim
+- [x] `TahtaKilit.Admin` — kurulum sihirbazı, ayarlar, kayıtlar
+- [x] Kurulum betikleri
+- [x] Windows 11'de uçtan uca deneme (önceki sürümle)
+- [ ] Bu sürümün Windows'ta denenmesi
+- [ ] Windows 10 akıllı tahta üzerinde saha testi
 
 ---
 
@@ -238,8 +191,8 @@ sayesinde WPF projeleri Windows dışında da derlenir.
 
 | Sınır | Etki | Azaltma |
 |---|---|---|
-| Güvenli Mod ile atlatılabilir | Teknik bilen kullanıcı kilidi aşar | Gerekirse 2. aşamada politika ile Güvenli Mod kapatılır |
-| `Ctrl+Alt+Del` engellenemez | Windows kilit ekranına düşülebilir | Görev Yöneticisi politika ile kapatılır, servis kilidi geri getirir |
-| Anahtar diskte, yönetici okuyabilir | Yerel yönetici anahtarı çıkarabilir | DPAPI + ACL; tahtada öğrenciye yönetici hesabı verilmemeli |
-| Telefon kaybolursa | Kaybolan telefon tahtaları açabilir | Uygulama PIN'i; tahtada anahtar yenileme (kurulum PIN'i ile) |
-| Kamera izni verilmemişse | QR okunamaz | 6 haneli çağrı kodunu elle girme yolu her zaman açık |
+| **Gizli anahtar yok** | Kuralı bilen herkes kilidi açabilir | Yok — bilinçli tercih (bkz. 2. bölüm) |
+| Güvenli Mod ile atlatılabilir | Teknik bilen kullanıcı kilidi aşar | Gerekirse politika ile Güvenli Mod kapatılır |
+| `Ctrl+Alt+Del` engellenemez | Windows kilit ekranına düşülebilir | Görev Yöneticisi kapatılır, servis kilidi geri getirir |
+| İmzasız çalıştırılabilir dosyalar | Windows 11 Akıllı Uygulama Denetimi engelliyor | Kod imzalama sertifikası, veya denetimin kapalı olduğu makineler |
+| Kamera izni verilmemişse | Karekod okunamaz | 12 haneli sayıyı elle girme yolu her zaman açık |

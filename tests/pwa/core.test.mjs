@@ -1,4 +1,4 @@
-// pwa/core.js testleri.  Calistirmak icin:  node --test pwa/test/
+// pwa/core.js testleri.  Calistirmak icin:  node --test tests/pwa/*.test.mjs
 //
 // Ayni vektorler C# tarafinda da kosuluyor (tests/TahtaKilit.Core.Tests).
 
@@ -6,8 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  computeResponse, decodeKey, encodeKey, formatForDisplay,
-  normalizeCode, normalizeResponse, parseChallengeQr, parsePairingQr,
+  formatAnswer, formatCode, normalizeAnswer, normalizeCode, parseQr, solve,
+  ANSWER_DIGITS, CODE_DIGITS,
 } from '../../pwa/core.js';
 
 const vectors = JSON.parse(
@@ -15,99 +15,66 @@ const vectors = JSON.parse(
 );
 
 for (const v of vectors.cases) {
-  test(`vektor: ${v.note} (${v.challenge})`, async () => {
-    const actual = await computeResponse(decodeKey(v.key), v.boardId, v.challenge);
-    assert.equal(actual, v.response);
+  test(`vektor: ${v.not} (${v.kod})`, () => {
+    assert.equal(solve(v.kod), v.cevap);
   });
 }
 
-test('cevap sekiz hanedir', async () => {
-  const key = decodeKey(vectors.cases[0].key);
-  const response = await computeResponse(key, 'ABCDEFGH', '4F7K2Q');
-  assert.match(response, /^\d{8}$/);
+test('cevap ilk ve son yarimin xoru', () => {
+  assert.equal(solve('123456654321'), String(123456 ^ 654321).padStart(7, '0'));
 });
 
-test('farkli cagri farkli cevap verir', async () => {
-  const key = decodeKey(vectors.cases[0].key);
-  assert.notEqual(
-    await computeResponse(key, 'ABCDEFGH', '4F7K2Q'),
-    await computeResponse(key, 'ABCDEFGH', '4F7K2R'),
-  );
+test('cevap hep yedi hanedir', () => {
+  assert.equal(solve('999999999999'), '0000000');
+  assert.equal(solve('000001000002').length, ANSWER_DIGITS);
 });
 
-test('cevap tahtaya baglidir', async () => {
-  const key = decodeKey(vectors.cases[0].key);
-  assert.notEqual(
-    await computeResponse(key, 'ABCDEFGH', '4F7K2Q'),
-    await computeResponse(key, 'ABCDEFGJ', '4F7K2Q'),
-  );
+test('xor simetriktir', () => {
+  assert.equal(solve('123456654321'), solve('654321123456'));
 });
 
-test('kucuk harf ve karistirilan harfler duzeltilir', async () => {
-  const key = decodeKey(vectors.cases[0].key);
-  assert.equal(
-    await computeResponse(key, 'abcdefgh', '4f7k2q'),
-    await computeResponse(key, 'ABCDEFGH', '4F7K2Q'),
-  );
+test('sifirla xor degistirmez', () => {
+  assert.equal(solve('000000123456'), '0123456');
+  assert.equal(solve('123456000000'), '0123456');
 });
 
-test('gecersiz anahtar uzunlugu reddedilir', async () => {
-  await assert.rejects(() => computeResponse(new Uint8Array(16), 'ABCDEFGH', '4F7K2Q'));
-});
-
-test('gecersiz cagri reddedilir', async () => {
-  const key = decodeKey(vectors.cases[0].key);
-  await assert.rejects(() => computeResponse(key, 'ABCDEFGH', '4F7K2'));
-  await assert.rejects(() => computeResponse(key, 'ABCDEFGH', '4F7K2U'));
+test('bozuk kod reddedilir', () => {
+  assert.throws(() => solve('12345665432'));
+  assert.throws(() => solve('1234566543210'));
+  assert.throws(() => solve('12345665432A'));
+  assert.throws(() => solve(''));
 });
 
 test('kod tekillestirme', () => {
-  assert.equal(normalizeCode('4f7k-2q', 6), '4F7K2Q');
-  assert.equal(normalizeCode('4F7K2O', 6), '4F7K20');
-  assert.equal(normalizeCode('4F7KIQ', 6), '4F7K1Q');
-  assert.equal(normalizeCode('4F7KLQ', 6), '4F7K1Q');
-  assert.equal(normalizeCode('4F7K2', 6), null);
-  assert.equal(normalizeCode('4F7K2QQ', 6), null);
-  assert.equal(normalizeCode('4F7K2U', 6), null);
-  assert.equal(normalizeCode(null, 6), null);
+  assert.equal(normalizeCode('1234 5665 4321'), '123456654321');
+  assert.equal(normalizeCode('1234-5665-4321'), '123456654321');
+  assert.equal(normalizeCode('12345665432'), null);
+  assert.equal(normalizeCode('1234566543210'), null);
+  assert.equal(normalizeCode(null), null);
 });
 
 test('cevap tekillestirme', () => {
-  assert.equal(normalizeResponse('42 63 04 48'), '42630448');
-  assert.equal(normalizeResponse('4263-0448'), '42630448');
-  assert.equal(normalizeResponse('4263044'), null);
-  assert.equal(normalizeResponse('426304489'), null);
-  assert.equal(normalizeResponse('4263O448'), null);
+  assert.equal(normalizeAnswer('053 0865'), '0530865');
+  assert.equal(normalizeAnswer('530865'), null);
+  assert.equal(normalizeAnswer('05308650'), null);
 });
 
-test('ekran bicimi ikiserli gruplar', () => {
-  assert.equal(formatForDisplay('42630448'), '42 63 04 48');
+test('ekran bicimleri okunakli', () => {
+  assert.equal(formatCode('123456654321'), '1234 5665 4321');
+  assert.equal(formatAnswer('0530865'), '053 0865');
 });
 
-test('anahtar kodlama gidis donus', () => {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const encoded = encodeKey(bytes);
-  assert.ok(!/[+/=]/.test(encoded));
-  assert.deepEqual(decodeKey(encoded), bytes);
+test('karekod icerigi cozulur', () => {
+  assert.equal(parseQr('123456654321'), '123456654321');
+  assert.equal(parseQr('  123456654321  '), '123456654321');
+  assert.equal(parseQr('bu kod degil'), null);
+  assert.equal(parseQr('{"v":1}'), null);
 });
 
-test('kilit ekrani QR icerigi cozulur', () => {
-  const parsed = parseChallengeQr('{"v":1,"id":"ABCDEFGH","c":"4F7K2Q"}');
-  assert.deepEqual(parsed, { boardId: 'ABCDEFGH', challenge: '4F7K2Q' });
-});
-
-test('eslestirme QR icerigi cozulur', () => {
-  const key = crypto.getRandomValues(new Uint8Array(32));
-  const json = JSON.stringify({ v: 1, id: 'ABCDEFGH', ad: 'Z-Blok 204', k: encodeKey(key) });
-  const parsed = parsePairingQr(json);
-  assert.equal(parsed.boardId, 'ABCDEFGH');
-  assert.equal(parsed.name, 'Z-Blok 204');
-  assert.deepEqual(parsed.key, key);
-});
-
-test('bozuk QR icerigi null doner', () => {
-  assert.equal(parseChallengeQr('bu json degil'), null);
-  assert.equal(parseChallengeQr('{"v":2,"id":"ABCDEFGH","c":"4F7K2Q"}'), null);
-  assert.equal(parseChallengeQr('{"v":1,"id":"KISA","c":"4F7K2Q"}'), null);
-  assert.equal(parsePairingQr('{"v":1,"id":"ABCDEFGH","ad":"X","k":"kisa"}'), null);
+test('her kod icin cevap uretilebiliyor', () => {
+  // Basa sifirli, tavan ve taban degerler dahil hicbir kod patlamamali.
+  for (const kod of ['000000000000', '999999999999', '000000999999', '999999000000']) {
+    assert.match(solve(kod), new RegExp(`^\\d{${ANSWER_DIGITS}}$`));
+  }
+  assert.equal(CODE_DIGITS, 12);
 });

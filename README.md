@@ -1,16 +1,22 @@
 # Tahta Kilit
 
-Windows 10 akıllı tahtaları kilitler; yalnızca öğretmenin telefonundaki
-uygulamadan üretilen tek kullanımlık şifreyle açılır.
+Windows 10/11 akıllı tahtaları kilitler; telefondaki uygulamadan üretilen
+şifreyle açılır.
 
-Tahtanın saati kaysa da, internet kopuk olsa da çalışır: zaman tabanlı kod
-(TOTP) yerine **çağrı–cevap** yöntemi kullanılır. Tahta ekranda bir karekod ve
-6 haneli çağrı kodu gösterir; öğretmen telefonuyla okutur, telefon 8 haneli
-cevabı üretir, öğretmen tahtaya girer.
+Tahta kilitlendiğinde ekranda 12 haneli bir sayı ve karekodu gösterilir.
+Öğretmen telefonuyla karekodu okutur; uygulama sayının iki yarısını XOR'layıp
+7 haneli şifreyi verir, öğretmen tahtaya girer. Sayı 30 saniyede bir yenilenir.
 
-- Sunucu yok, internet yok, merkezi kayıt yok.
-- Her açılışta kod değişir; görülen kod ikinci kez işe yaramaz.
-- Bir telefon birden çok tahtayı açabilir.
+- Sunucu yok, internet yok, eşleştirme yok, saklanan veri yok.
+- Kurulumda yalnızca tahtanın adı sorulur.
+- Aynı telefon uygulaması bütün tahtalarda çalışır.
+
+> **Bu bir güvenlik önlemi değildir.** Gizli anahtar yoktur: kilidin cevabı,
+> kilidin ekranında gösterilen sayıdan hesaplanır ve kuralı bilen herkes aynı
+> sonucu bulabilir. Düşünmeden veya yanlışlıkla kullanımı engeller; kararlı
+> birini engellemez. Bu bilinçli bir tercihtir —
+> gerekçesi ve gerçek koruma isteyenler için alternatif:
+> [docs/TASARIM.md](docs/TASARIM.md#2-güvenlik-modeli--önce-bu-okunmalı)
 
 Kararların tamamı ve mimari: **[docs/TASARIM.md](docs/TASARIM.md)**
 
@@ -18,28 +24,28 @@ Kararların tamamı ve mimari: **[docs/TASARIM.md](docs/TASARIM.md)**
 
 | Parça | Klasör | Durum |
 |---|---|---|
-| Protokol çekirdeği | `src/TahtaKilit.Core` | ✅ Hazır, testli |
+| Açma kuralı | `src/TahtaKilit.Core` | ✅ Hazır, testli |
 | Telefon uygulaması (PWA) | `pwa/` | ✅ Çalışıyor, testli |
 | Windows tutkalı | `src/TahtaKilit.Windows` | ✅ Yazıldı, derleniyor |
 | Windows servisi | `src/TahtaKilit.Service` | ✅ Yazıldı, derleniyor |
 | Kilit ekranı (WPF) | `src/TahtaKilit.Lock` | ✅ Yazıldı, derleniyor |
 | Kurulum sihirbazı (WPF) | `src/TahtaKilit.Admin` | ✅ Çalışıyor |
 
-Windows 11'de (Korumalı Alan içinde) uçtan uca denendi: kurulum, telefonla
-eşleştirme, kilit ekranı ve tek kullanımlık şifreyle açma çalışıyor.
+Windows 11'de (Korumalı Alan içinde) uçtan uca denendi — ancak bu deneme
+**önceki, gizli anahtarlı sürümle** yapıldı. XOR sürümü derleniyor ve testleri
+geçiyor, henüz Windows'ta çalıştırılmadı.
 
-**Henüz denenmemiş olanlar:** açılışta kilitlenme, servis kurulumu ve
-watchdog, ders saati takvimi, boşta kalma kilidi, çoklu monitör, kaçış
-tuşlarının gerçekten engellenmesi ve gerçek bir akıllı tahta.
+**Henüz denenmemiş olanlar:** bu sürümün tamamı Windows'ta, açılışta
+kilitlenme, servis watchdog'u, ders saati takvimi, boşta kalma kilidi, çoklu
+monitör, kaçış tuşlarının gerçekten engellenmesi ve gerçek bir akıllı tahta.
 
 ## Telefon uygulaması
 
 **https://tahta-kilit.netlify.app**
 
 Telefonda aç, tarayıcı menüsünden "Ana ekrana ekle" de. Kurulduktan sonra
-internet gerekmez. Sayfa herkese açıktır ama tek başına bir işe yaramaz:
-bir tahtayı açabilmek için o tahtanın eşleştirme karekodunu okutmuş olman
-gerekir.
+internet gerekmez. Eşleştirme, hesap veya saklanan veri yoktur: uygulama
+karekodu okur, XOR'u hesaplar, şifreyi gösterir.
 
 Yayınlamak için: `netlify.toml` yalnızca `pwa/` klasörünü yayınlar.
 
@@ -61,9 +67,8 @@ Kurmadan denemek için: `tools\sihirbaz.ps1` (kurulum sihirbazı) ve
 imzasız programları engelliyorsa `tools\sandbox-ac.ps1` ile Korumalı Alan'da
 dene — orada bu kısıtlama yok ve pencere kapanınca iz kalmaz.
 
-Sihirbaz tahtaya bir ad ve kurulum PIN'i sorar, ardından eşleştirme karekodunu
-gösterir. **Kurulumu bitirmeden önce telefonunla o karekodu okut** — tahtayı
-açabilecek tek şey o.
+Sihirbaz yalnızca tahtanın adını sorar. "Kur" denince tahta kilitlenir;
+telefonla karekodu okutup çıkan şifreyi girerek açarsın.
 
 Kaldırmak için: `powershell -ExecutionPolicy Bypass -File tools\kaldir.ps1`
 
@@ -112,13 +117,17 @@ Protokol değişirse vektörler yeniden üretilmelidir:
 npm run vectors
 ```
 
-## Protokol özeti
+## Açma kuralı özeti
 
 ```
-cevap = HMAC-SHA256(anahtar, "TK1:<tahta-kimliği>:<çağrı>")  →  8 hane
+şifre = (ilk 6 hane) XOR (son 6 hane)  →  7 haneye tamamlanır
+
+örnek:  1234 5665 4321  →  123456 XOR 654321 = 530865  →  053 0865
 ```
 
-- **Anahtar** — tahta başına 256 bit, kurulumda üretilir, eşleştirme karekoduyla telefona aktarılır.
-- **Çağrı** — 6 karakter (Crockford Base32), her denemede yeniden üretilir.
-- **Cevap** — RFC 4226 dinamik kesme ile 8 haneye indirilir.
-- Zaman ve ağ hiçbir adımda kullanılmaz.
+- **Sayı** — 12 hane, 30 saniyede bir yenilenir.
+- **Şifre** — en fazla 1048575 olabildiği için başa sıfır konarak 7 haneye
+  tamamlanır.
+- Süre ölçümü sistem saatiyle değil açılıştan beri geçen süreyle yapılır;
+  tahtanın saati kaysa da çalışır.
+- Ağ hiçbir adımda kullanılmaz.

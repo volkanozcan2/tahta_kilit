@@ -110,10 +110,7 @@ public class BoardConfigTests
 
     private static BoardConfig OrnekConfig() => new()
     {
-        BoardId = UnlockProtocol.NewBoardId(),
         BoardName = "Z-Blok 204",
-        Key = Base64Url.Encode(UnlockProtocol.NewKey()),
-        Tier = 2,
         IdleLockMinutes = 10,
     };
 
@@ -133,10 +130,7 @@ public class BoardConfigTests
             var geri = store.Load();
 
             Assert.NotNull(geri);
-            Assert.Equal(config.BoardId, geri.BoardId);
             Assert.Equal(config.BoardName, geri.BoardName);
-            Assert.Equal(config.DecodeKey(), geri.DecodeKey());
-            Assert.Equal(2, geri.Tier);
             Assert.Equal(10, geri.IdleLockMinutes);
             Assert.Single(geri.ToSchedule().Windows);
             Assert.Equal(new TimeOnly(7, 30), geri.ToSchedule().Windows[0].Start);
@@ -148,8 +142,10 @@ public class BoardConfigTests
     }
 
     [Fact]
-    public void Anahtar_diske_duz_yazilmaz()
+    public void Ayarlar_diske_duz_metin_olarak_yazilmaz()
     {
+        // Sir yok, ama ayarlar da duz metin durmamali: tahta adini degistirmek
+        // dosyayi bir metin duzenleyiciyle acmak kadar kolay olmasin.
         var yol = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.GetRandomFileName());
         var config = OrnekConfig();
 
@@ -158,9 +154,9 @@ public class BoardConfigTests
             new ConfigStore(yol, new FakeProtector()).Save(config);
 
             var ham = File.ReadAllBytes(yol);
-            var duz = System.Text.Encoding.UTF8.GetBytes(config.Key);
+            var duz = System.Text.Encoding.UTF8.GetBytes(config.BoardName);
 
-            Assert.False(Bulunuyor(ham, duz), "Anahtar dosyada duz halde gorunuyor.");
+            Assert.False(Bulunuyor(ham, duz), "Tahta adi dosyada duz halde gorunuyor.");
         }
         finally
         {
@@ -197,61 +193,5 @@ public class BoardConfigTests
     {
         var yol = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.IO.Path.GetRandomFileName());
         Assert.Null(new ConfigStore(yol, new FakeProtector()).Load());
-    }
-}
-
-public class AdminPinTests
-{
-    [Fact]
-    public void Dogru_pin_kabul_edilir()
-    {
-        var config = new BoardConfig();
-        AdminPin.Set(config, "142536");
-
-        Assert.True(AdminPin.Verify(config, "142536"));
-    }
-
-    [Fact]
-    public void Yanlis_pin_reddedilir()
-    {
-        var config = new BoardConfig();
-        AdminPin.Set(config, "142536");
-
-        Assert.False(AdminPin.Verify(config, "142537"));
-        Assert.False(AdminPin.Verify(config, ""));
-        Assert.False(AdminPin.Verify(config, null));
-    }
-
-    [Fact]
-    public void Pin_diske_duz_yazilmaz()
-    {
-        var config = new BoardConfig();
-        AdminPin.Set(config, "142536");
-
-        Assert.DoesNotContain("142536", config.AdminPinHash);
-        Assert.DoesNotContain("142536", config.AdminPinSalt);
-    }
-
-    [Fact]
-    public void Ayni_pin_farkli_tahtalarda_farkli_ozet_verir()
-    {
-        var a = new BoardConfig();
-        var b = new BoardConfig();
-        AdminPin.Set(a, "142536");
-        AdminPin.Set(b, "142536");
-
-        Assert.NotEqual(a.AdminPinHash, b.AdminPinHash);
-    }
-
-    [Fact]
-    public void Kisa_pin_reddedilir()
-    {
-        Assert.Throws<ArgumentException>(() => AdminPin.Set(new BoardConfig(), "1234"));
-    }
-
-    [Fact]
-    public void Pin_belirlenmemisse_hicbir_sey_dogrulanmaz()
-    {
-        Assert.False(AdminPin.Verify(new BoardConfig(), "142536"));
     }
 }

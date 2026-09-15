@@ -13,236 +13,105 @@ internal sealed class FakeClock : IMonotonicClock
 
 public class LockGuardTests
 {
-    private static readonly byte[] Key = Base64Url.Decode("JTA7RlFcZ3J9iJOeqbS_ytXg6_YBDBciLThDTllkb3o");
-    private const string BoardId = "ABCDEFGH";
-
-    private static LockGuard Olustur(FakeClock clock, int tier = 0)
+    private static LockGuard Olustur(FakeClock clock)
     {
-        // Cagrilar sirayla: 000001, 000002, ... boylece test ongorulebilir olur.
+        // Kodlar sirayla: 000000000001, 000000000002, ... boylece ongorulebilir.
         var sayac = 0;
-        return new LockGuard(Key, BoardId, tier, clock,
-            () => (++sayac).ToString("D6"));
+        return new LockGuard(clock, () => (++sayac).ToString("D12"));
     }
-
-    private static string DogruCevap(LockGuard guard) =>
-        UnlockProtocol.ComputeResponse(Key, BoardId, guard.CurrentChallenge);
 
     [Fact]
     public void Dogru_cevap_kilidi_acar()
     {
         var guard = Olustur(new FakeClock());
-        Assert.Equal(UnlockOutcome.Success, guard.TryUnlock(DogruCevap(guard)).Outcome);
+
+        var sonuc = guard.TryUnlock(XorProtocol.Solve(guard.CurrentCode));
+
+        Assert.Equal(UnlockOutcome.Success, sonuc);
     }
 
     [Fact]
-    public void Cagri_her_denemeden_sonra_degisir()
-    {
-        var guard = Olustur(new FakeClock());
-        var ilk = guard.CurrentChallenge;
-
-        guard.TryUnlock("00000000");
-
-        Assert.NotEqual(ilk, guard.CurrentChallenge);
-    }
-
-    [Fact]
-    public void Kullanilan_cevap_ikinci_kez_ise_yaramaz()
-    {
-        // Omuz ustunden kodu goren biri sonra ayni kodu kullanamamali.
-        var guard = Olustur(new FakeClock());
-        var cevap = DogruCevap(guard);
-
-        Assert.Equal(UnlockOutcome.Success, guard.TryUnlock(cevap).Outcome);
-        Assert.Equal(UnlockOutcome.WrongCode, guard.TryUnlock(cevap).Outcome);
-    }
-
-    [Fact]
-    public void Yanlis_denemede_kalan_hak_azalir()
+    public void Yanlis_cevap_reddedilir()
     {
         var guard = Olustur(new FakeClock());
 
-        var sonuc = guard.TryUnlock("00000000");
-
-        Assert.Equal(UnlockOutcome.WrongCode, sonuc.Outcome);
-        Assert.Equal(LockGuard.AttemptsPerRound - 1, sonuc.AttemptsLeft);
+        // 9999999 hicbir zaman dogru olamaz: en buyuk XOR sonucu 1048575.
+        Assert.Equal(UnlockOutcome.WrongCode, guard.TryUnlock("9999999"));
     }
 
     [Fact]
-    public void Bes_yanlis_denemeden_sonra_beklemeye_girer()
+    public void Yanlis_cevap_kodu_degistirmez()
     {
+        // Ogretmen yanlis yazdiysa ekrandaki kod ayni kalmali; yoksa her
+        // hatada karekodu yeniden okutmak gerekirdi.
         var guard = Olustur(new FakeClock());
+        var kod = guard.CurrentCode;
 
-        for (var i = 0; i < LockGuard.AttemptsPerRound - 1; i++)
-            Assert.Equal(UnlockOutcome.WrongCode, guard.TryUnlock("00000000").Outcome);
+        guard.TryUnlock("9999999");
 
-        var sonuc = guard.TryUnlock("00000000");
-
-        Assert.Equal(UnlockOutcome.TooManyAttempts, sonuc.Outcome);
-        Assert.Equal(TimeSpan.FromSeconds(10), sonuc.Wait);
+        Assert.Equal(kod, guard.CurrentCode);
     }
 
     [Fact]
-    public void Bekleme_sirasinda_dogru_cevap_bile_kabul_edilmez()
+    public void Basarili_acilis_kodu_yeniler()
+    {
+        // Kilit tekrar kapandiginda eski cevap ise yaramamali.
+        var guard = Olustur(new FakeClock());
+        var kod = guard.CurrentCode;
+
+        guard.TryUnlock(XorProtocol.Solve(kod));
+
+        Assert.NotEqual(kod, guard.CurrentCode);
+    }
+
+    [Fact]
+    public void Kod_otuz_saniye_sonra_yenilenir()
     {
         var clock = new FakeClock();
         var guard = Olustur(clock);
-        BeklemeyeSok(guard);
+        var kod = guard.CurrentCode;
 
-        var sonuc = guard.TryUnlock(DogruCevap(guard));
+        clock.Advance(TimeSpan.FromSeconds(29));
+        Assert.Equal(kod, guard.CurrentCode);
 
-        Assert.Equal(UnlockOutcome.TooManyAttempts, sonuc.Outcome);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        Assert.NotEqual(kod, guard.CurrentCode);
     }
 
     [Fact]
-    public void Bekleme_dolunca_tekrar_denenebilir()
-    {
-        var clock = new FakeClock();
-        var guard = Olustur(clock);
-        BeklemeyeSok(guard);
-
-        clock.Advance(TimeSpan.FromSeconds(11));
-
-        Assert.Equal(UnlockOutcome.Success, guard.TryUnlock(DogruCevap(guard)).Outcome);
-    }
-
-    [Fact]
-    public void Bekleme_suresi_her_turda_artar()
+    public void Kalan_sure_geri_sayar()
     {
         var clock = new FakeClock();
         var guard = Olustur(clock);
 
-        TimeSpan[] beklenen =
-        [
-            TimeSpan.FromSeconds(10),
-            TimeSpan.FromSeconds(30),
-            TimeSpan.FromMinutes(2),
-            TimeSpan.FromMinutes(5),
-            TimeSpan.FromMinutes(5), // tavan
-        ];
+        Assert.Equal(30, Math.Ceiling(guard.RemainingLife.TotalSeconds));
 
-        foreach (var sure in beklenen)
-        {
-            var sonuc = BeklemeyeSok(guard);
-            Assert.Equal(sure, sonuc.Wait);
-            clock.Advance(sure + TimeSpan.FromSeconds(1));
-        }
+        clock.Advance(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(20, Math.Ceiling(guard.RemainingLife.TotalSeconds));
     }
 
     [Fact]
-    public void Basarili_acilis_cezayi_sifirlar()
+    public void Kod_yenilenince_kalan_sure_sifirlanir()
     {
         var clock = new FakeClock();
         var guard = Olustur(clock);
 
-        BeklemeyeSok(guard);
-        clock.Advance(TimeSpan.FromSeconds(11));
-        guard.TryUnlock(DogruCevap(guard));
+        clock.Advance(TimeSpan.FromSeconds(31));
+        _ = guard.CurrentCode; // yenilenmeyi tetikler
 
-        Assert.Equal(0, guard.Tier);
-        Assert.Equal(TimeSpan.FromSeconds(10), BeklemeyeSok(guard).Wait);
+        Assert.Equal(30, Math.Ceiling(guard.RemainingLife.TotalSeconds));
     }
 
     [Fact]
-    public void Devralinan_ceza_kademesi_yeniden_baslatmayla_atlatilamaz()
+    public void Suresi_dolmus_kodun_cevabi_kabul_edilmez()
     {
-        // Servis kademeyi diske yazip geri verir; tahtayi kapatip acmak
-        // bekleme cezasini sifirlamamali.
-        var guard = Olustur(new FakeClock(), tier: 3);
+        var clock = new FakeClock();
+        var guard = Olustur(clock);
+        var eskiCevap = XorProtocol.Solve(guard.CurrentCode);
 
-        Assert.Equal(TimeSpan.FromMinutes(5), BeklemeyeSok(guard).Wait);
-    }
+        clock.Advance(TimeSpan.FromSeconds(31));
 
-    [Fact]
-    public void Kilit_ekrani_qr_icerigi_cozulebilir()
-    {
-        var guard = Olustur(new FakeClock());
-
-        var payload = QrJson.Deserialize<ChallengePayload>(guard.CurrentChallengeQr);
-
-        Assert.NotNull(payload);
-        Assert.Equal(ChallengePayload.CurrentVersion, payload.V);
-        Assert.Equal(BoardId, payload.Id);
-        Assert.Equal(guard.CurrentChallenge, payload.C);
-    }
-
-    private static UnlockResult BeklemeyeSok(LockGuard guard)
-    {
-        UnlockResult sonuc = default;
-        for (var i = 0; i < LockGuard.AttemptsPerRound; i++)
-            sonuc = guard.TryUnlock("00000000");
-
-        return sonuc;
-    }
-}
-
-public class QrPayloadTests
-{
-    [Fact]
-    public void Eslestirme_qr_donup_gelince_ayni_anahtari_verir()
-    {
-        var key = UnlockProtocol.NewKey();
-        var id = UnlockProtocol.NewBoardId();
-
-        var json = QrJson.Serialize(PairingPayload.Create(id, "Z-Blok 204", key));
-        var geri = QrJson.Deserialize<PairingPayload>(json);
-
-        Assert.NotNull(geri);
-        Assert.Equal(id, geri.Id);
-        Assert.Equal("Z-Blok 204", geri.Ad);
-        Assert.Equal(key, geri.DecodeKey());
-    }
-
-    [Fact]
-    public void Bozuk_json_null_doner()
-    {
-        Assert.Null(QrJson.Deserialize<PairingPayload>("bu json degil"));
-    }
-
-    [Fact]
-    public void Base64url_tur_gidis_donus()
-    {
-        var bytes = UnlockProtocol.NewKey();
-        var encoded = Base64Url.Encode(bytes);
-
-        Assert.DoesNotContain('+', encoded);
-        Assert.DoesNotContain('/', encoded);
-        Assert.DoesNotContain('=', encoded);
-        Assert.Equal(bytes, Base64Url.Decode(encoded));
-    }
-}
-
-public class Crockford32Tests
-{
-    [Theory]
-    [InlineData("4f7k2q", "4F7K2Q")]      // kucuk harf
-    [InlineData("4F7K 2Q", "4F7K2Q")]     // bosluk
-    [InlineData("4F7K-2Q", "4F7K2Q")]     // tire
-    [InlineData("4F7K2O", "4F7K20")]      // O harfi -> sifir
-    [InlineData("4F7KI Q", "4F7K1Q")]     // I harfi -> bir
-    [InlineData("4F7KLQ", "4F7K1Q")]      // L harfi -> bir
-    public void Karistirilan_karakterler_duzeltilir(string girilen, string beklenen)
-    {
-        Assert.True(Crockford32.TryNormalize(girilen, 6, out var sonuc));
-        Assert.Equal(beklenen, sonuc);
-    }
-
-    [Theory]
-    [InlineData("4F7K2")]     // kisa
-    [InlineData("4F7K2QQ")]   // uzun
-    [InlineData("4F7K2U")]    // U alfabede yok
-    [InlineData("4F7K2!")]    // gecersiz karakter
-    [InlineData("")]
-    [InlineData(null)]
-    public void Gecersiz_kod_reddedilir(string? girilen)
-    {
-        Assert.False(Crockford32.TryNormalize(girilen, 6, out _));
-    }
-
-    [Fact]
-    public void Kodlama_sabit_uzunluktadir()
-    {
-        Assert.Equal("000000", Crockford32.Encode(0, 6));
-        Assert.Equal("000001", Crockford32.Encode(1, 6));
-        Assert.Equal("ZZZZZZ", Crockford32.Encode((1UL << 30) - 1, 6));
+        Assert.Equal(UnlockOutcome.WrongCode, guard.TryUnlock(eskiCevap));
     }
 }

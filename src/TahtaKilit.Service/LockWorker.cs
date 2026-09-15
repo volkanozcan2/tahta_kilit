@@ -36,10 +36,10 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
         if (_config is null)
             return;
 
-        logger.LogInformation("Tahta: {Ad} ({Kimlik})", _config.BoardName, _config.BoardId);
+        logger.LogInformation("Tahta: {Ad}", _config.BoardName);
 
         _configStamp = ConfigStamp();
-        _coordinator = new LockCoordinator(_config, onTierChanged: PersistTier);
+        _coordinator = new LockCoordinator(_config);
 
         using var pipe = new LockPipeServer(HandleRequest);
         var serving = pipe.RunAsync(stoppingToken);
@@ -84,11 +84,7 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
                 break;
 
             case LockStatus.Yanlis:
-                logger.LogWarning("Yanlis sifre girildi. Kalan hak: {Hak}", status.AttemptsLeft);
-                break;
-
-            case LockStatus.Bekle:
-                logger.LogWarning("Cok fazla yanlis deneme; {Saniye} saniye bekleme.", status.WaitSeconds);
+                logger.LogWarning("Yanlis sifre girildi.");
                 break;
 
             case LockStatus.Kilitli when request.Op == LockRequest.Kilitle:
@@ -141,21 +137,8 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
             return;
         }
 
-        // Anahtar veya kimlik degistiyse tahta yeniden eslestirilmis demektir;
-        // dogrulayici bastan kurulur ve tahta kilitli duruma doner.
-        var yenidenEslesme = yeni.BoardId != _config!.BoardId || yeni.Key != _config.Key;
-
         _config = yeni;
-
-        if (yenidenEslesme)
-        {
-            logger.LogInformation("Tahta yeniden eslestirildi; kilit sifirlaniyor.");
-            _coordinator = new LockCoordinator(_config, onTierChanged: PersistTier);
-        }
-        else
-        {
-            logger.LogInformation("Ayarlar guncellendi.");
-        }
+        logger.LogInformation("Ayarlar guncellendi.");
     }
 
     /// <summary>
@@ -243,13 +226,6 @@ public sealed class LockWorker(ILogger<LockWorker> logger) : BackgroundService
 
         _config.LastKnownTime = now;
         SaveConfig();
-    }
-
-    private void PersistTier(int tier)
-    {
-        _config!.Tier = tier;
-        SaveConfig();
-        logger.LogWarning("Yanlis deneme ceza kademesi {Kademe} olarak kaydedildi.", tier);
     }
 
     private void SaveConfig()

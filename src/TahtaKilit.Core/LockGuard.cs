@@ -6,22 +6,13 @@ public enum UnlockOutcome
     /// <summary>Cevap dogru; kilit acilir.</summary>
     Success,
 
-    /// <summary>Cevap yanlis. Yeni bir cagri uretildi, tekrar denenebilir.</summary>
+    /// <summary>Cevap yanlis.</summary>
     WrongCode,
-
-    /// <summary>Cok fazla yanlis deneme yapildi; bekleme suresi dolmadan denenemez.</summary>
-    TooManyAttempts,
 }
 
-/// <param name="Outcome">Denemenin sonucu.</param>
-/// <param name="Wait">Bekleme varsa kalan sure.</param>
-/// <param name="AttemptsLeft">Beklemeye girmeden once kalan deneme hakki.</param>
-public readonly record struct UnlockResult(UnlockOutcome Outcome, TimeSpan Wait, int AttemptsLeft);
-
 /// <summary>
-/// Acilistan beri gecen sureyi veren saat. Duvar saati <em>bilerek</em>
-/// kullanilmaz: tahtanin saati kayabildigi gibi, saati ileri alarak bekleme
-/// cezasi da atlatilabilirdi.
+/// Acilistan beri gecen sureyi veren saat. Duvar saati kullanilmaz: tahtanin
+/// saati kayabilir, kodun omru ise kaymadan olculmelidir.
 /// </summary>
 public interface IMonotonicClock
 {
@@ -35,113 +26,75 @@ public sealed class SystemMonotonicClock : IMonotonicClock
 }
 
 /// <summary>
-/// Kilit ekraninin durum makinesi: acik cagriyi tutar, girilen cevabi dogrular,
-/// yanlis denemelerde artan bekleme uygular.
+/// Kilit ekraninin durum makinesi: ekranda gosterilen kodu tutar, omru
+/// dolunca yenisini uretir ve girilen cevabi dogrular.
 /// </summary>
 public sealed class LockGuard
 {
-    /// <summary>Beklemeye girmeden once verilen yanlis deneme hakki.</summary>
-    public const int AttemptsPerRound = 5;
-
-    private static readonly TimeSpan[] Backoff =
-    [
-        TimeSpan.FromSeconds(10),
-        TimeSpan.FromSeconds(30),
-        TimeSpan.FromMinutes(2),
-        TimeSpan.FromMinutes(5),
-    ];
-
-    private readonly byte[] _key;
-    private readonly string _boardId;
     private readonly IMonotonicClock _clock;
-    private readonly Func<string> _challengeFactory;
+    private readonly Func<string> _codeFactory;
 
-    private int _failures;
-    private long _lockedUntil;
+    private string _code;
+    private long _generatedAt;
 
-    /// <param name="key">Tahtanin gizli anahtari.</param>
-    /// <param name="boardId">Tahta kimligi.</param>
-    /// <param name="initialTier">
-    /// Onceki oturumdan devralinan ceza kademesi. Servis bunu diske yazip geri
-    /// verirse, yeniden baslatarak bekleme cezasindan kacilamaz.
-    /// </param>
     /// <param name="clock">Test icin degistirilebilir monotonik saat.</param>
-    /// <param name="challengeFactory">Test icin degistirilebilir cagri ureteci.</param>
-    public LockGuard(
-        byte[] key,
-        string boardId,
-        int initialTier = 0,
-        IMonotonicClock? clock = null,
-        Func<string>? challengeFactory = null)
+    /// <param name="codeFactory">Test icin degistirilebilir kod ureteci.</param>
+    public LockGuard(IMonotonicClock? clock = null, Func<string>? codeFactory = null)
     {
-        ArgumentNullException.ThrowIfNull(key);
-        ArgumentException.ThrowIfNullOrEmpty(boardId);
-
-        _key = key;
-        _boardId = boardId;
         _clock = clock ?? new SystemMonotonicClock();
-        _challengeFactory = challengeFactory ?? UnlockProtocol.NewChallenge;
+        _codeFactory = codeFactory ?? XorProtocol.NewCode;
 
-        Tier = Math.Clamp(initialTier, 0, Backoff.Length);
-        CurrentChallenge = _challengeFactory();
+        _code = _codeFactory();
+        _generatedAt = _clock.ElapsedMilliseconds;
     }
 
-    /// <summary>Ekranda gosterilen gecerli cagri kodu.</summary>
-    public string CurrentChallenge { get; private set; }
-
-    /// <summary>Kilit ekranindaki QR'a yazilacak icerik.</summary>
-    public string CurrentChallengeQr =>
-        QrJson.Serialize(ChallengePayload.Create(_boardId, CurrentChallenge));
-
-    /// <summary>Su anki ceza kademesi; servis bunu kalici saklamalidir.</summary>
-    public int Tier { get; private set; }
-
-    /// <summary>Bekleme varsa kalan sure, yoksa <see cref="TimeSpan.Zero"/>.</summary>
-    public TimeSpan RemainingWait
+    /// <summary>
+    /// Ekranda gosterilen gecerli kod. Omru dolmussa okunurken yenilenir.
+    /// </summary>
+    public string CurrentCode
     {
         get
         {
-            var left = _lockedUntil - _clock.ElapsedMilliseconds;
-            return left > 0 ? TimeSpan.FromMilliseconds(left) : TimeSpan.Zero;
+            RotateIfExpired();
+            return _code;
         }
     }
 
-    /// <summary>
-    /// Girilen cevabi dogrular. Sonuc ne olursa olsun cagri yenilenir: boylece
-    /// ayni cagri uzerinde deneme yapilamaz ve gorulen bir kod tekrar kullanilamaz.
-    /// </summary>
-    public UnlockResult TryUnlock(string? entered)
+    /// <summary>Gecerli kodun yenilenmesine kalan sure.</summary>
+    public TimeSpan RemainingLife
     {
-        var wait = RemainingWait;
-        if (wait > TimeSpan.Zero)
-            return new UnlockResult(UnlockOutcome.TooManyAttempts, wait, 0);
-
-        var ok = UnlockProtocol.VerifyResponse(_key, _boardId, CurrentChallenge, entered);
-        Rotate();
-
-        if (ok)
+        get
         {
-            _failures = 0;
-            Tier = 0;
-            _lockedUntil = 0;
-            return new UnlockResult(UnlockOutcome.Success, TimeSpan.Zero, AttemptsPerRound);
+            RotateIfExpired();
+            var gecen = _clock.ElapsedMilliseconds - _generatedAt;
+            var kalan = XorProtocol.CodeLifetime.TotalMilliseconds - gecen;
+            return kalan > 0 ? TimeSpan.FromMilliseconds(kalan) : TimeSpan.Zero;
         }
-
-        _failures++;
-        if (_failures < AttemptsPerRound)
-            return new UnlockResult(UnlockOutcome.WrongCode, TimeSpan.Zero, AttemptsPerRound - _failures);
-
-        var penalty = Backoff[Math.Min(Tier, Backoff.Length - 1)];
-        _failures = 0;
-        Tier = Math.Min(Tier + 1, Backoff.Length);
-        _lockedUntil = _clock.ElapsedMilliseconds + (long)penalty.TotalMilliseconds;
-
-        return new UnlockResult(UnlockOutcome.TooManyAttempts, penalty, 0);
     }
 
     /// <summary>
-    /// Yeni bir cagri uretir. Kilit ekrani yenilendiginde veya QR bir sure
-    /// ekranda kaldiginda cagrilabilir.
+    /// Girilen cevabi dogrular. Dogruysa kod yenilenir; boylece kilit tekrar
+    /// kapandiginda eski cevap ise yaramaz.
     /// </summary>
-    public void Rotate() => CurrentChallenge = _challengeFactory();
+    public UnlockOutcome TryUnlock(string? entered)
+    {
+        if (!XorProtocol.Verify(CurrentCode, entered))
+            return UnlockOutcome.WrongCode;
+
+        Rotate();
+        return UnlockOutcome.Success;
+    }
+
+    /// <summary>Yeni bir kod uretir.</summary>
+    public void Rotate()
+    {
+        _code = _codeFactory();
+        _generatedAt = _clock.ElapsedMilliseconds;
+    }
+
+    private void RotateIfExpired()
+    {
+        if (_clock.ElapsedMilliseconds - _generatedAt >= XorProtocol.CodeLifetime.TotalMilliseconds)
+            Rotate();
+    }
 }

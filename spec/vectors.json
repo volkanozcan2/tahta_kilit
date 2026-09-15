@@ -1,48 +1,45 @@
 {
-  "version": "TK1",
-  "aciklama": "Tahta Kilit cagri-cevap test vektorleri. spec/generate-vectors.mjs ile uretilir.",
+  "aciklama": "Tahta Kilit XOR test vektorleri. spec/generate-vectors.mjs ile uretilir.",
   "cases": [
     {
-      "note": "temel durum",
-      "key": "JTA7RlFcZ3J9iJOeqbS_ytXg6_YBDBciLThDTllkb3o",
-      "boardId": "ABCDEFGH",
-      "challenge": "4F7K2Q",
-      "response": "42630448"
+      "not": "temel durum",
+      "kod": "123456654321",
+      "cevap": "0530865"
     },
     {
-      "note": "en kucuk degerler",
-      "key": "SlVga3aBjJeirbjDztnk7_oFEBsmMTxHUl1oc36JlJ8",
-      "boardId": "00000000",
-      "challenge": "000000",
-      "response": "51268846"
+      "not": "hepsi sifir",
+      "kod": "000000000000",
+      "cevap": "0000000"
     },
     {
-      "note": "en buyuk degerler",
-      "key": "b3qFkJumsbzH0t3o8_4JFB8qNUBLVmFsd4KNmKOuucQ",
-      "boardId": "ZZZZZZZZ",
-      "challenge": "ZZZZZZ",
-      "response": "49915114"
+      "not": "ayni yarimlar, sonuc sifir",
+      "kod": "999999999999",
+      "cevap": "0000000"
     },
     {
-      "note": "karisik",
-      "key": "lJ-qtcDL1uHs9wINGCMuOURPWmVwe4aRnKeyvcjT3uk",
-      "boardId": "TK3M9WP2",
-      "challenge": "H8N4TV",
-      "response": "08527634"
+      "not": "ilk yarim sifir",
+      "kod": "000000999999",
+      "cevap": "0999999"
     },
     {
-      "note": "karisik",
-      "key": "ucTP2uXw-wYRHCcyPUhTXml0f4qVoKu2wczX4u34Aw4",
-      "boardId": "QRSTVWXY",
-      "challenge": "9BCDFG",
-      "response": "56669646"
+      "not": "son yarim sifir",
+      "kod": "999999000000",
+      "cevap": "0999999"
     },
     {
-      "note": "cevap sifirla basliyor (dolgulama testi)",
-      "key": "3un0_woVICs2QUxXYm14g46ZpK-6xdDb5vH8BxIdKDM",
-      "boardId": "ZEROPAD1",
-      "challenge": "000002",
-      "response": "04899920"
+      "not": "en kucuk fark",
+      "kod": "000001000002",
+      "cevap": "0000003"
+    },
+    {
+      "not": "bit siniri civari",
+      "kod": "524287524288",
+      "cevap": "1048575"
+    },
+    {
+      "not": "ayrik bitler",
+      "kod": "000015000240",
+      "cevap": "0000255"
     }
   ]
 }

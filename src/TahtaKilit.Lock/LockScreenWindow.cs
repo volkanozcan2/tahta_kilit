@@ -11,7 +11,7 @@ using TahtaKilit.Core;
 namespace TahtaKilit.Lock;
 
 /// <summary>
-/// Kilit ekrani. Solda karekod ve 6 haneli cagri, sagda 8 haneli sifre girisi.
+/// Kilit ekrani. Solda karekod ve 12 haneli sayi, sagda 7 haneli sifre girisi.
 ///
 /// Arayuz XAML yerine C# ile kurulur; tek dosyada, derleyici denetiminde.
 /// Tahta dokunmatik oldugu icin ekran tus takimi zorunludur, ancak klavye
@@ -29,14 +29,15 @@ internal sealed class LockScreenWindow : Window
     private readonly Func<string, Task<LockStatus?>> _unlock;
 
     private readonly TextBlock _boardName = Metin("", 26, Yazi);
-    private readonly TextBlock _challenge = Mono("······", 52, Yazi);
+    private readonly TextBlock _challenge = Mono("···· ···· ····", 44, Yazi);
+    private readonly TextBlock _countdown = Metin("", 15, Soluk);
     private readonly TextBlock _entry = Mono("", 44, Yazi);
     private readonly TextBlock _message = Metin("", 18, Soluk);
     private readonly Image _qr = new() { Width = 320, Height = 320, Margin = new Thickness(0, 12, 0, 12) };
     private readonly List<Button> _keys = [];
 
     private string _entered = "";
-    private string _shownChallenge = "";
+    private string _shownCode = "";
     private bool _closeAllowed;
     private bool _submitting;
 
@@ -65,7 +66,7 @@ internal sealed class LockScreenWindow : Window
     public void ShowServiceWaiting()
     {
         _boardName.Text = "Tahta Kilit";
-        _challenge.Text = "······";
+        _challenge.Text = "···· ···· ····";
         _message.Foreground = Soluk;
         _message.Text = "Kilit servisi başlatılıyor, lütfen bekleyin…";
         SetKeysEnabled(false);
@@ -76,30 +77,21 @@ internal sealed class LockScreenWindow : Window
     {
         _boardName.Text = string.IsNullOrWhiteSpace(status.BoardName) ? "Tahta Kilit" : status.BoardName;
 
-        if (status.Challenge != _shownChallenge)
+        if (status.Code != _shownCode)
         {
-            _shownChallenge = status.Challenge;
-            _challenge.Text = status.Challenge;
-            _qr.Source = ToImage(QrCode.CreatePng(status.ChallengeQr, pixelsPerModule: 8));
+            _shownCode = status.Code;
+            _challenge.Text = XorProtocol.FormatCode(status.Code);
+            _qr.Source = ToImage(QrCode.CreatePng(status.Code, pixelsPerModule: 8));
             ClearEntry();
         }
 
-        if (status.WaitSeconds > 0)
-        {
-            SetKeysEnabled(false);
-            _message.Foreground = Hata;
-            _message.Text = $"Çok fazla yanlış deneme. Kalan süre: {Sure(status.WaitSeconds)}";
-            return;
-        }
-
+        _countdown.Text = $"Bu sayı {status.RemainingSeconds} saniye sonra değişecek";
         SetKeysEnabled(true);
 
         if (status.Result == LockStatus.Yanlis)
         {
             _message.Foreground = Hata;
-            _message.Text = status.AttemptsLeft > 0
-                ? $"Şifre yanlış. Tahtadaki kod yenilendi, baştan okut. Kalan hak: {status.AttemptsLeft}"
-                : "Şifre yanlış.";
+            _message.Text = "Şifre yanlış. Telefondaki sayıyı olduğu gibi gir.";
         }
         else if (_entered.Length == 0)
         {
@@ -107,8 +99,6 @@ internal sealed class LockScreenWindow : Window
             _message.Text = "Şifreyi telefonundaki uygulamadan al.";
         }
     }
-
-    private static string Sure(int saniye) => $"{saniye / 60:00}:{saniye % 60:00}";
 
     // -------------------------------------------------------------- yerlesim
 
@@ -168,9 +158,10 @@ internal sealed class LockScreenWindow : Window
             Child = _qr,
         });
 
-        panel.Children.Add(Metin("Kamera çalışmıyorsa bu kodu uygulamaya yaz", 16, Soluk));
+        panel.Children.Add(Metin("Kamera çalışmıyorsa bu sayıyı uygulamaya yaz", 16, Soluk));
         _challenge.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(_challenge);
+        panel.Children.Add(_countdown);
 
         return panel;
     }
@@ -179,7 +170,7 @@ internal sealed class LockScreenWindow : Window
     {
         var panel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
 
-        panel.Children.Add(Metin("Telefonun verdiği şifre", 18, Soluk));
+        panel.Children.Add(Metin("Telefonun verdiği 7 haneli şifre", 18, Soluk));
 
         _entry.Margin = new Thickness(0, 4, 0, 0);
         panel.Children.Add(new Border
@@ -265,15 +256,15 @@ internal sealed class LockScreenWindow : Window
 
     private void Append(char digit)
     {
-        if (_submitting || _entered.Length >= UnlockProtocol.ResponseDigits)
+        if (_submitting || _entered.Length >= XorProtocol.AnswerDigits)
             return;
 
         _entered += digit;
         RenderEntry();
 
-        // Sekiz hane tamamlaninca kendiliginden gonderilir; tahtada ayri bir
+        // Yedi hane tamamlaninca kendiliginden gonderilir; tahtada ayri bir
         // "onayla" tusuna basmak dokunmatikte fazladan adim olurdu.
-        if (_entered.Length == UnlockProtocol.ResponseDigits)
+        if (_entered.Length == XorProtocol.AnswerDigits)
             _ = SubmitAsync();
     }
 
@@ -294,8 +285,8 @@ internal sealed class LockScreenWindow : Window
 
     private void RenderEntry()
     {
-        var gosterilen = _entered.PadRight(UnlockProtocol.ResponseDigits, '·');
-        _entry.Text = string.Join(' ', Enumerable.Range(0, 4).Select(i => gosterilen.Substring(i * 2, 2)));
+        var gosterilen = _entered.PadRight(XorProtocol.AnswerDigits, '·');
+        _entry.Text = gosterilen[..3] + " " + gosterilen[3..];
     }
 
     private async Task SubmitAsync()

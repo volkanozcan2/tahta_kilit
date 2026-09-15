@@ -49,45 +49,35 @@ public class QrCodeTests
     [Fact]
     public void Kilit_ekrani_karekodu_geri_okunabiliyor()
     {
-        var icerik = QrJson.Serialize(ChallengePayload.Create("ABCDEFGH", "4F7K2Q"));
+        var kod = XorProtocol.NewCode();
 
-        var okunan = Oku(QrCode.CreateMatrix(icerik));
+        Assert.Equal(kod, Oku(QrCode.CreateMatrix(kod)));
+    }
 
-        Assert.Equal(icerik, okunan);
+    [Theory]
+    [InlineData("000000000000")]
+    [InlineData("999999999999")]
+    [InlineData("123456654321")]
+    public void Her_kod_eksiksiz_okunuyor(string kod)
+    {
+        // Basta sifir olan kodlar da bozulmadan gecmeli.
+        Assert.Equal(kod, Oku(QrCode.CreateMatrix(kod)));
     }
 
     [Fact]
-    public void Okunan_karekod_telefonun_bekledigi_bicimde()
+    public void Okunan_karekoddan_cevap_hesaplanabiliyor()
     {
-        // Telefon tarafi (pwa/core.js) bu alanlari ariyor.
-        var icerik = QrJson.Serialize(ChallengePayload.Create("TK3M9WP2", "H8N4TV"));
+        var kod = XorProtocol.NewCode();
 
-        var payload = QrJson.Deserialize<ChallengePayload>(Oku(QrCode.CreateMatrix(icerik)));
+        var okunan = Oku(QrCode.CreateMatrix(kod));
 
-        Assert.NotNull(payload);
-        Assert.Equal(1, payload.V);
-        Assert.Equal("TK3M9WP2", payload.Id);
-        Assert.Equal("H8N4TV", payload.C);
-    }
-
-    [Fact]
-    public void Eslestirme_karekodu_anahtari_eksiksiz_tasiyor()
-    {
-        // Eslestirme karekodu 32 baytlik anahtari tasir; en buyuk icerik budur.
-        var key = UnlockProtocol.NewKey();
-        var icerik = QrJson.Serialize(
-            PairingPayload.Create(UnlockProtocol.NewBoardId(), "Z-Blok 204 Akilli Tahta", key));
-
-        var payload = QrJson.Deserialize<PairingPayload>(Oku(QrCode.CreateMatrix(icerik)));
-
-        Assert.NotNull(payload);
-        Assert.Equal(key, payload.DecodeKey());
+        Assert.Equal(XorProtocol.Solve(kod), XorProtocol.Solve(okunan));
     }
 
     [Fact]
     public void Png_ciktisi_gecerli_bir_png()
     {
-        var png = QrCode.CreatePng(QrJson.Serialize(ChallengePayload.Create("ABCDEFGH", "4F7K2Q")));
+        var png = QrCode.CreatePng(XorProtocol.NewCode());
 
         Assert.True(png.Length > 100);
         Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, png[..4]); // PNG imzasi

@@ -1,60 +1,30 @@
 // Ortak test vektorlerini uretir: spec/vectors.json
 //
-// Vektorler hem C# (tests/TahtaKilit.Core.Tests) hem de JS (pwa/test) tarafinda
-// kosulur. Iki bagimsiz uygulamanin ayni sonucu verdigini garanti eder.
-// Protokol degisirse: node spec/generate-vectors.mjs
+// Vektorler hem C# hem JS tarafinda kosulur; iki uygulamanin ayni cevabi
+// verdigini garanti eder. Protokol degisirse: node spec/generate-vectors.mjs
 
 import { writeFileSync } from 'node:fs';
-import { computeResponse, encodeKey, VERSION } from '../pwa/core.js';
+import { solve } from '../pwa/core.js';
 
-// Sabit, tahmin edilebilir anahtarlar — sadece test icin.
-function testKey(seed) {
-  const key = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) key[i] = (seed * 37 + i * 11) & 0xff;
-  return key;
-}
-
-const inputs = [
-  { key: testKey(1), boardId: 'ABCDEFGH', challenge: '4F7K2Q', note: 'temel durum' },
-  { key: testKey(2), boardId: '00000000', challenge: '000000', note: 'en kucuk degerler' },
-  { key: testKey(3), boardId: 'ZZZZZZZZ', challenge: 'ZZZZZZ', note: 'en buyuk degerler' },
-  { key: testKey(4), boardId: 'TK3M9WP2', challenge: 'H8N4TV', note: 'karisik' },
-  { key: testKey(5), boardId: 'QRSTVWXY', challenge: '9BCDFG', note: 'karisik' },
+const kodlar = [
+  { kod: '123456654321', not: 'temel durum' },
+  { kod: '000000000000', not: 'hepsi sifir' },
+  { kod: '999999999999', not: 'ayni yarimlar, sonuc sifir' },
+  { kod: '000000999999', not: 'ilk yarim sifir' },
+  { kod: '999999000000', not: 'son yarim sifir' },
+  { kod: '000001000002', not: 'en kucuk fark' },
+  { kod: '524287524288', not: 'bit siniri civari' },
+  { kod: '000015000240', not: 'ayrik bitler' },
 ];
 
-const cases = [];
-for (const input of inputs) {
-  cases.push({
-    note: input.note,
-    key: encodeKey(input.key),
-    boardId: input.boardId,
-    challenge: input.challenge,
-    response: await computeResponse(input.key, input.boardId, input.challenge),
-  });
-}
+const cases = kodlar.map(({ kod, not }) => ({ not, kod, cevap: solve(kod) }));
 
-// Basa sifir gelen bir durum da bulunsun: dolgulama hatasi sessizce gecmesin.
-const zeroKey = testKey(6);
-for (let i = 0; i < 100000; i++) {
-  const challenge = String(i).padStart(6, '0').replace(/[^0-9]/g, '0');
-  const response = await computeResponse(zeroKey, 'ZEROPAD1', challenge);
-  if (response.startsWith('0')) {
-    cases.push({
-      note: 'cevap sifirla basliyor (dolgulama testi)',
-      key: encodeKey(zeroKey),
-      boardId: 'ZEROPAD1',
-      challenge,
-      response,
-    });
-    break;
-  }
-}
+writeFileSync(
+  new URL('./vectors.json', import.meta.url),
+  JSON.stringify({
+    aciklama: 'Tahta Kilit XOR test vektorleri. spec/generate-vectors.mjs ile uretilir.',
+    cases,
+  }, null, 2) + '\n',
+);
 
-const vectors = {
-  version: VERSION,
-  aciklama: 'Tahta Kilit cagri-cevap test vektorleri. spec/generate-vectors.mjs ile uretilir.',
-  cases,
-};
-
-writeFileSync(new URL('./vectors.json', import.meta.url), JSON.stringify(vectors, null, 2) + '\n');
 console.log(`${cases.length} vektor yazildi.`);

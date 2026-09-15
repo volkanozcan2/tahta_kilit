@@ -2,8 +2,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using TahtaKilit.Core;
 using TahtaKilit.Windows;
 
@@ -12,9 +10,9 @@ namespace TahtaKilit.Admin;
 /// <summary>
 /// Kurulum sihirbazi ve yonetim ekrani.
 ///
-/// Ilk calistirmada tahta adi ve kurulum PIN'i sorulur, gizli anahtar
-/// uretilir, veri klasorunun izinleri kisitlanir ve eslestirme karekodu
-/// gosterilir. Sonraki calistirmalarda PIN sorulur.
+/// Ilk calistirmada yalnizca tahtanin adi sorulur; gizli anahtar veya
+/// eslestirme yoktur. Kilidi acan sayi, tahtanin ekraninda gosterilen
+/// sayidan hesaplanir (bkz. docs/TASARIM.md).
 /// </summary>
 internal sealed class AdminWindow : Window
 {
@@ -26,12 +24,12 @@ internal sealed class AdminWindow : Window
     {
         Title = "Tahta Kilit — Kurulum";
         Width = 720;
-        Height = 760;
+        Height = 700;
         Background = Theme.Zemin;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         _config = _store.Load();
-        Content = _config is null ? BuildSetupPage() : BuildPinPage();
+        Content = _config is null ? BuildSetupPage() : BuildMainPage();
     }
 
     private static ScrollViewer Page(params UIElement[] children)
@@ -52,10 +50,8 @@ internal sealed class AdminWindow : Window
     private UIElement BuildSetupPage()
     {
         var ad = Theme.Giris();
-        var pin1 = Theme.Sifre();
-        var pin2 = Theme.Sifre();
         var hata = Theme.Metin("", Theme.Hata);
-        var kur = Theme.Dugme("Kur ve eşleştirme karekodunu göster", birincil: true);
+        var kur = Theme.Dugme("Kur", birincil: true);
 
         kur.Click += (_, _) =>
         {
@@ -68,21 +64,9 @@ internal sealed class AdminWindow : Window
                 return;
             }
 
-            if (pin1.Password.Length < AdminPin.MinLength)
-            {
-                hata.Text = $"Kurulum PIN'i en az {AdminPin.MinLength} karakter olmalı.";
-                return;
-            }
-
-            if (pin1.Password != pin2.Password)
-            {
-                hata.Text = "İki PIN aynı değil.";
-                return;
-            }
-
             try
             {
-                _config = Kur(tahtaAdi, pin1.Password);
+                _config = Kur(tahtaAdi);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -90,88 +74,63 @@ internal sealed class AdminWindow : Window
                 return;
             }
 
-            Content = BuildPairingPage(ilkKurulum: true);
+            if (ServiceControl.IsInstalled())
+                ServiceControl.Start();
+
+            Content = BuildMainPage();
         };
 
         return Page(
             Theme.Baslik("Tahta Kilit kurulumu"),
             Theme.Metin(
-                "Bu tahta için bir gizli anahtar üretilecek. Anahtar yalnızca bu bilgisayarda " +
-                "ve öğretmenlerin telefonunda bulunur; hiçbir sunucuya gönderilmez."),
-            Theme.Etiket("Tahtanın adı (öğretmenin telefonunda görünecek)"),
+                "Tahta kilitlendiğinde ekranda 12 haneli bir sayı ve karekod gösterilir. " +
+                "Öğretmen telefonundaki uygulamayla karekodu okutur, uygulama açma şifresini verir."),
+            Theme.Etiket("Tahtanın adı (kilit ekranında görünecek)"),
             ad,
-            Theme.Etiket($"Kurulum PIN'i (en az {AdminPin.MinLength} karakter)"),
-            pin1,
-            Theme.Etiket("Kurulum PIN'i (tekrar)"),
-            pin2,
-            Theme.Metin(
-                "Bu PIN yeni öğretmen telefonu eklemek, takvimi değiştirmek ve kilidi kaldırmak " +
-                "için gerekir. Öğrencilerle paylaşma.",
-                Theme.Soluk),
+            UyariKutusu(),
             hata,
             kur);
     }
 
-    private BoardConfig Kur(string tahtaAdi, string pin)
+    private BoardConfig Kur(string tahtaAdi)
     {
         var config = new BoardConfig
         {
-            BoardId = UnlockProtocol.NewBoardId(),
             BoardName = tahtaAdi,
-            Key = Base64Url.Encode(UnlockProtocol.NewKey()),
             IdleLockMinutes = 0,
         };
 
-        AdminPin.Set(config, pin);
-
-        // Anahtarin asil korumasi klasor izinleridir; yapilandirma yazilmadan
-        // once uygulanmalidir ki dosya hicbir an herkese acik olmasin.
         DataDirectorySecurity.Restrict(WindowsPaths.DataDirectory);
         _store.Save(config);
 
         return config;
     }
 
-    // ------------------------------------------------------------- 2. PIN
-
-    private UIElement BuildPinPage()
+    /// <summary>
+    /// Kurulum yapan kisi bu sistemin ne yapip ne yapmadigini bilmeli:
+    /// kilit, kuralı bilen birini durdurmaz.
+    /// </summary>
+    private static UIElement UyariKutusu() => new Border
     {
-        var pin = Theme.Sifre();
-        var hata = Theme.Metin("", Theme.Hata);
-        var gir = Theme.Dugme("Devam", birincil: true);
+        Background = Theme.Kart,
+        CornerRadius = new CornerRadius(10),
+        Padding = new Thickness(16),
+        Margin = new Thickness(0, 18, 0, 6),
+        Child = Theme.Metin(
+            "Bilmen gereken: bu kilit gizli anahtar kullanmaz. Açma şifresi, ekranda " +
+            "gösterilen sayıdan hesaplanır ve kuralı bilen herkes aynı sonucu bulabilir. " +
+            "Düşünmeden veya yanlışlıkla kullanımı engeller; kararlı birini engellemez.",
+            Theme.Soluk),
+    };
 
-        void Dogrula()
-        {
-            if (AdminPin.Verify(_config!, pin.Password))
-                Content = BuildMainPage();
-            else
-                hata.Text = "PIN yanlış.";
-        }
-
-        gir.Click += (_, _) => Dogrula();
-        pin.KeyDown += (_, e) =>
-        {
-            if (e.Key == System.Windows.Input.Key.Enter)
-                Dogrula();
-        };
-
-        return Page(
-            Theme.Baslik(_config!.BoardName),
-            Theme.Metin("Devam etmek için kurulum PIN'ini gir."),
-            Theme.Etiket("Kurulum PIN'i"),
-            pin,
-            hata,
-            gir);
-    }
-
-    // ------------------------------------------------------------- 3. yonetim
+    // ------------------------------------------------------------- 2. yonetim
 
     private UIElement BuildMainPage()
     {
         var durum = Theme.Metin("", Theme.Basari);
 
-        var esle = Theme.Dugme("Öğretmen telefonu ekle (eşleştirme karekodu)", birincil: true);
-        esle.Click += (_, _) => Content = BuildPairingPage(ilkKurulum: false);
+        var ad = Theme.Giris();
+        ad.Text = _config!.BoardName;
 
         // --- Takvim ---
         var takvimAcik = Theme.Onay("Ders saati dışında tahtayı kilitle");
@@ -188,7 +147,7 @@ internal sealed class AdminWindow : Window
             (Gun: DayOfWeek.Sunday, Kutu: Theme.Onay("Paz")),
         };
 
-        var mevcut = _config!.ToSchedule();
+        var mevcut = _config.ToSchedule();
         if (mevcut.Windows.Count > 0)
         {
             var pencere = mevcut.Windows[0];
@@ -212,9 +171,9 @@ internal sealed class AdminWindow : Window
         foreach (var (_, kutu) in gunler)
             gunSatiri.Children.Add(kutu);
 
-        var saatSatiri = new StackPanel { Orientation = Orientation.Horizontal };
         bas.Width = 90;
         bit.Width = 90;
+        var saatSatiri = new StackPanel { Orientation = Orientation.Horizontal };
         saatSatiri.Children.Add(Theme.Metin("Kullanılabilir saatler: ", Theme.Soluk));
         saatSatiri.Children.Add(bas);
         saatSatiri.Children.Add(Theme.Metin("  —  ", Theme.Soluk));
@@ -229,6 +188,13 @@ internal sealed class AdminWindow : Window
         kaydet.Click += (_, _) =>
         {
             durum.Foreground = Theme.Hata;
+
+            var yeniAd = ad.Text.Trim();
+            if (yeniAd.Length == 0)
+            {
+                durum.Text = "Tahtanın adı boş olamaz.";
+                return;
+            }
 
             if (!int.TryParse(bosta.Text.Trim(), out var dakika) || dakika is < 0 or > 240)
             {
@@ -259,6 +225,7 @@ internal sealed class AdminWindow : Window
                 _config.Schedule.Clear();
             }
 
+            _config.BoardName = yeniAd;
             _config.IdleLockMinutes = dakika;
 
             try
@@ -284,15 +251,10 @@ internal sealed class AdminWindow : Window
 
         return Page(
             Theme.Baslik(_config.BoardName),
-            Theme.Metin($"Tahta kimliği: {_config.BoardId}", Theme.Soluk),
             IzinUyarisi(),
 
-            Theme.Etiket("ÖĞRETMENLER"),
-            esle,
-            Theme.Metin(
-                "Karekodu okutan her öğretmen bu tahtayı açabilir. Telefonu kaybolan bir " +
-                "öğretmen için anahtarı yenilemek gerekirse kurulumu baştan yap.",
-                Theme.Soluk),
+            Theme.Etiket("TAHTANIN ADI"),
+            ad,
 
             Theme.Etiket("DERS SAATİ TAKVİMİ"),
             takvimAcik,
@@ -315,18 +277,16 @@ internal sealed class AdminWindow : Window
     }
 
     /// <summary>
-    /// Veri klasoru herkese acik kalmissa anahtar okunabilir demektir;
-    /// bu sessizce gecilmemeli.
+    /// Veri klasoru herkese acik kalmissa ayarlar kurcalanabilir demektir.
     /// </summary>
-    private UIElement IzinUyarisi()
+    private static UIElement IzinUyarisi()
     {
         if (DataDirectorySecurity.IsRestricted(WindowsPaths.DataDirectory))
             return Theme.Metin("Veri klasörü korumalı.", Theme.Basari);
 
         var duzelt = Theme.Dugme("İzinleri düzelt");
         var uyari = Theme.Metin(
-            "UYARI: Veri klasörü öğrenci hesapları tarafından okunabilir durumda. " +
-            "Gizli anahtar bu durumda korunmaz.",
+            "UYARI: Veri klasörü öğrenci hesapları tarafından değiştirilebilir durumda.",
             Theme.Hata);
 
         duzelt.Click += (_, _) =>
@@ -364,8 +324,7 @@ internal sealed class AdminWindow : Window
     private void Kaldir(TextBlock durum)
     {
         var onay = MessageBox.Show(
-            "Bu tahtadaki kilit kaldırılacak ve gizli anahtar silinecek. " +
-            "Öğretmenlerin telefonundaki kayıt da geçersiz olur.\n\nDevam edilsin mi?",
+            "Bu tahtadaki kilit kaldırılacak.\n\nDevam edilsin mi?",
             "Kilidi kaldır",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
@@ -398,71 +357,5 @@ internal sealed class AdminWindow : Window
             MessageBoxImage.Information);
 
         Close();
-    }
-
-    // ------------------------------------------------------- 4. eslestirme QR
-
-    private UIElement BuildPairingPage(bool ilkKurulum)
-    {
-        var icerik = QrJson.Serialize(
-            PairingPayload.Create(_config!.BoardId, _config.BoardName, _config.DecodeKey()));
-
-        var resim = new Image
-        {
-            Width = 340,
-            Height = 340,
-            Source = ToImage(QrCode.CreatePng(icerik, pixelsPerModule: 8)),
-        };
-
-        var cerceve = new Border
-        {
-            Background = Brushes.White,
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(16),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(0, 10, 0, 10),
-            Child = resim,
-        };
-
-        var bitti = Theme.Dugme(ilkKurulum ? "Kurulumu bitir" : "Geri", birincil: true);
-        bitti.Click += (_, _) =>
-        {
-            if (!ilkKurulum)
-            {
-                Content = BuildMainPage();
-                return;
-            }
-
-            if (ServiceControl.IsInstalled())
-                ServiceControl.Start();
-
-            Close();
-        };
-
-        return Page(
-            Theme.Baslik("Öğretmen telefonunu eşleştir"),
-            Theme.Metin(
-                "Öğretmen, telefonundaki Tahta Kilit uygulamasında \"Yeni tahta ekle\" deyip " +
-                "bu karekodu okutsun. Aynı karekodu bu sınıfa giren her öğretmen okutabilir."),
-            cerceve,
-            Theme.Metin(
-                "DİKKAT: Bu karekod tahtanın gizli anahtarını taşır. Ekranda öğrenciler " +
-                "varken gösterme, fotoğrafını çektirme.",
-                Theme.Hata),
-            bitti);
-    }
-
-    private static BitmapImage ToImage(byte[] png)
-    {
-        var image = new BitmapImage();
-
-        using var stream = new MemoryStream(png);
-        image.BeginInit();
-        image.CacheOption = BitmapCacheOption.OnLoad;
-        image.StreamSource = stream;
-        image.EndInit();
-        image.Freeze();
-
-        return image;
     }
 }

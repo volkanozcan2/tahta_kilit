@@ -28,7 +28,7 @@ function chromiumYolu() {
 
 const ROOT = new URL('../../pwa/', import.meta.url).pathname;
 const vectors = JSON.parse(readFileSync(new URL('../../spec/vectors.json', import.meta.url), 'utf8'));
-const ORNEK = vectors.cases[0];
+const ORNEK = vectors.cases[0];  // { kod, cevap }
 
 const TURLER = {
   '.html': 'text/html; charset=utf-8',
@@ -70,103 +70,55 @@ after(async () => {
   server?.close();
 });
 
-test('ilk acilista PIN kurulumu istenir', async () => {
-  await page.waitForSelector('#view-pin:not([hidden])');
-  const aciklama = await page.textContent('#pin-aciklama');
-  assert.match(aciklama, /PIN belirle/);
-  assert.equal(await page.isHidden('#pin-input2'), false, 'PIN tekrar alani gorunmeli');
-});
-
-test('PIN belirlenince ana ekrana gecilir, tahta yok uyarisi cikar', async () => {
-  await page.fill('#pin-input', '123456');
-  await page.fill('#pin-input2', '123456');
-  await page.click('#pin-form button[type=submit]');
-
+test('acilista ana ekran gelir', async () => {
   await page.waitForSelector('#view-home:not([hidden])');
-  assert.equal(await page.isVisible('#tahta-yok'), true);
+  assert.equal(await page.isVisible('#ac-btn'), true);
 });
 
-test('PIN tekrari uyusmazsa hata gosterilir', async () => {
-  await page.click('#ayarlar-ac');
-  await page.click('#pin-degistir');
-  await page.waitForSelector('#view-pin:not([hidden])');
-
-  await page.fill('#pin-input', '111111');
-  await page.fill('#pin-input2', '222222');
-  await page.click('#pin-form button[type=submit]');
-
-  assert.match(await page.textContent('#pin-hata'), /aynı değil/i);
-
-  // PIN'i degistirmeden devam et.
-  await page.fill('#pin-input2', '111111');
-  await page.click('#pin-form button[type=submit]');
-  await page.waitForSelector('#view-home:not([hidden])');
-});
-
-test('eslesen tahta ana ekranda listelenir', async () => {
-  // Kamera taklit edilemedigi icin eslestirme dogrudan kasaya yazilir.
-  await page.evaluate(async ({ id, ad, k }) => {
-    const { Vault } = await import('./store.js');
-    const vault = await Vault.unlock('111111');
-    await vault.addBoard({ boardId: id, name: ad, key: k });
-  }, { id: ORNEK.boardId, ad: 'Z-Blok 204', k: ORNEK.key });
-
-  await page.reload();
-  await page.fill('#pin-input', '111111');
-  await page.click('#pin-form button[type=submit]');
-
-  await page.waitForSelector('#view-home:not([hidden])');
-  assert.equal(await page.isVisible('#tahta-var'), true);
-  assert.match(await page.textContent('#tahta-listesi'), /Z-Blok 204/);
-});
-
-test('elle girilen cagri dogru sifreyi uretir', async () => {
+test('elle girilen kod dogru sifreyi uretir', async () => {
   await page.click('#elle-btn');
   await page.waitForSelector('#view-manual:not([hidden])');
 
-  await page.selectOption('#manual-tahta', ORNEK.boardId);
-  await page.fill('#manual-kod', ORNEK.challenge);
+  await page.fill('#manual-kod', ORNEK.kod);
   await page.click('#manual-form button[type=submit]');
 
   await page.waitForSelector('#view-result:not([hidden])');
 
   const gosterilen = (await page.textContent('#sonuc-kod')).replace(/\s/g, '');
-  assert.equal(gosterilen, ORNEK.response, 'Arayuzun urettigi sifre vektorle ayni olmali');
-  assert.match(await page.textContent('#sonuc-tahta'), /Z-Blok 204/);
+  assert.equal(gosterilen, ORNEK.cevap, 'Arayuzun urettigi sifre vektorle ayni olmali');
 });
 
-test('kucuk harfle ve bosluklu yazilan cagri da kabul edilir', async () => {
+test('kod yazarken dortlu gruplara ayriliyor', async () => {
   await page.click('#sonuc-bitti');
   await page.click('#elle-btn');
 
-  await page.selectOption('#manual-tahta', ORNEK.boardId);
-  await page.fill('#manual-kod', ORNEK.challenge.toLowerCase().replace(/^(.{3})/, '$1 '));
+  await page.fill('#manual-kod', '123456654321');
+
+  assert.equal(await page.inputValue('#manual-kod'), '1234 5665 4321');
+});
+
+test('bosluklu yazilan kod da kabul edilir', async () => {
   await page.click('#manual-form button[type=submit]');
-
   await page.waitForSelector('#view-result:not([hidden])');
-  assert.equal((await page.textContent('#sonuc-kod')).replace(/\s/g, ''), ORNEK.response);
+
+  assert.equal((await page.textContent('#sonuc-kod')).replace(/\s/g, ''), '0530865');
 });
 
-test('gecersiz cagri kodu reddedilir', async () => {
+test('eksik kod reddedilir', async () => {
   await page.click('#sonuc-bitti');
   await page.click('#elle-btn');
 
-  await page.fill('#manual-kod', 'ABC');
+  await page.fill('#manual-kod', '12345');
   await page.click('#manual-form button[type=submit]');
 
   assert.equal(await page.isVisible('#view-result'), false);
-  assert.match(await page.textContent('#manual-hata'), /6 karakter/);
+  assert.match(await page.textContent('#manual-hata'), /12 haneli/);
 });
 
-test('tahta silinince listeden kalkar', async () => {
-  page.on('dialog', (d) => d.accept());
-
+test('bitti ana ekrana doner', async () => {
   await page.click('[data-geri]');
-  await page.click('#ayarlar-ac');
-  await page.click('#ayar-listesi .sil');
 
-  await page.waitForFunction(() => !document.querySelector('#ayar-listesi .sil'));
-  assert.equal(await page.textContent('#ayar-listesi'), '');
+  await page.waitForSelector('#view-home:not([hidden])');
 });
 
 test('sayfada javascript hatasi olusmadi', () => {

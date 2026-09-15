@@ -1,7 +1,7 @@
 // Cevrimdisi calisma: tum uygulama dosyalari kurulumda onbellege alinir.
 // Surum degistiginde (CACHE) eski onbellek silinir.
 
-const CACHE = 'tahta-kilit-v1';
+const CACHE = 'tahta-kilit-v2';
 
 const DOSYALAR = [
   './',
@@ -9,7 +9,6 @@ const DOSYALAR = [
   './styles.css',
   './app.js',
   './core.js',
-  './store.js',
   './vendor/jsQR.js',
   './manifest.webmanifest',
   './icon.svg',

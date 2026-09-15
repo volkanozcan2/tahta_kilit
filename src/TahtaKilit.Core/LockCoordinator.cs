@@ -10,7 +10,6 @@ public sealed record LockRequest(
 {
     public const string Durum = "durum";
     public const string Ac = "ac";
-    public const string Yenile = "yenile";
 
     /// <summary>Kilit ajani "simdi kilitle" der: bosta kalma veya elle kilitleme.</summary>
     public const string Kilitle = "kilitle";
@@ -20,47 +19,36 @@ public sealed record LockRequest(
 public sealed record LockStatus(
     [property: JsonPropertyName("sonuc")] string Result,
     [property: JsonPropertyName("tahta")] string BoardName,
-    [property: JsonPropertyName("cagri")] string Challenge,
-    [property: JsonPropertyName("qr")] string ChallengeQr,
-    [property: JsonPropertyName("beklemeSn")] int WaitSeconds,
-    [property: JsonPropertyName("kalanHak")] int AttemptsLeft,
+    [property: JsonPropertyName("kod")] string Code,
+    [property: JsonPropertyName("kalanSn")] int RemainingSeconds,
     [property: JsonPropertyName("bostaDk")] int IdleLockMinutes = 0)
 {
     public const string Kilitli = "kilitli";
     public const string Acildi = "acildi";
     public const string Yanlis = "yanlis";
-    public const string Bekle = "bekle";
 }
 
 /// <summary>
 /// Kilit ekrani ile dogrulama mantigi arasindaki koprü.
 ///
-/// Gizli anahtar yalnizca bu nesnede, yani SYSTEM olarak calisan serviste
-/// bulunur. Kullanici oturumundaki kilit ekrani anahtari hicbir zaman gormez;
-/// sadece girilen yaziyi iletir ve "acildi / yanlis / bekle" cevabini alir.
+/// Dogrulama SYSTEM olarak calisan serviste yapilir; kilit ekrani girilen
+/// yaziyi iletip sonucu alir. (Bu kuralda gizli anahtar olmadigi icin bu
+/// ayrim guvenlik saglamaz, ama kilit durumunun tek bir yerde tutulmasini
+/// saglar: ekran oldurulup yeniden baslatilsa da kilit acik kalmaz.)
 /// </summary>
 public sealed class LockCoordinator
 {
     private readonly LockGuard _guard;
     private readonly string _boardName;
     private readonly int _idleLockMinutes;
-    private readonly Action<int>? _onTierChanged;
 
-    private int _lastTier;
-
-    /// <param name="onTierChanged">
-    /// Ceza kademesi degistiginde cagrilir; servis bunu diske yazar ki
-    /// tahtayi yeniden baslatmak bekleme cezasini sifirlamasin.
-    /// </param>
-    public LockCoordinator(BoardConfig config, IMonotonicClock? clock = null, Action<int>? onTierChanged = null)
+    public LockCoordinator(BoardConfig config, IMonotonicClock? clock = null)
     {
         ArgumentNullException.ThrowIfNull(config);
 
         _boardName = config.BoardName;
         _idleLockMinutes = config.IdleLockMinutes;
-        _onTierChanged = onTierChanged;
-        _guard = new LockGuard(config.DecodeKey(), config.BoardId, config.Tier, clock);
-        _lastTier = _guard.Tier;
+        _guard = new LockGuard(clock);
     }
 
     /// <summary>Kilit su anda acik mi?</summary>
@@ -68,12 +56,17 @@ public sealed class LockCoordinator
 
     public LockStatus Handle(LockRequest request) => request.Op switch
     {
-        LockRequest.Durum => Snapshot(CurrentState),
-        LockRequest.Yenile => Refresh(),
         LockRequest.Ac => Unlock(request.Response),
         LockRequest.Kilitle => LockAndReport(),
         _ => Snapshot(CurrentState),
     };
+
+    /// <summary>Tahtayi yeniden kilitler (takvim, bosta kalma veya elle kilitleme).</summary>
+    public void Lock()
+    {
+        IsUnlocked = false;
+        _guard.Rotate();
+    }
 
     private string CurrentState => IsUnlocked ? LockStatus.Acildi : LockStatus.Kilitli;
 
@@ -83,51 +76,22 @@ public sealed class LockCoordinator
         return Snapshot(LockStatus.Kilitli);
     }
 
-    /// <summary>Tahtayi yeniden kilitler (takvim, bosta kalma veya elle kilitleme).</summary>
-    public void Lock()
-    {
-        IsUnlocked = false;
-        _guard.Rotate();
-    }
-
-    private LockStatus Refresh()
-    {
-        // Cagri ekranda uzun sure bekledi; yenisini uret.
-        _guard.Rotate();
-        return Snapshot(CurrentState);
-    }
-
     private LockStatus Unlock(string? response)
     {
-        var sonuc = _guard.TryUnlock(response);
-
-        if (_guard.Tier != _lastTier)
+        if (_guard.TryUnlock(response) == UnlockOutcome.Success)
         {
-            _lastTier = _guard.Tier;
-            _onTierChanged?.Invoke(_lastTier);
+            IsUnlocked = true;
+            return Snapshot(LockStatus.Acildi);
         }
 
-        switch (sonuc.Outcome)
-        {
-            case UnlockOutcome.Success:
-                IsUnlocked = true;
-                return Snapshot(LockStatus.Acildi, sonuc);
-
-            case UnlockOutcome.TooManyAttempts:
-                return Snapshot(LockStatus.Bekle, sonuc);
-
-            default:
-                return Snapshot(LockStatus.Yanlis, sonuc);
-        }
+        return Snapshot(LockStatus.Yanlis);
     }
 
-    private LockStatus Snapshot(string result, UnlockResult? sonuc = null) => new(
+    private LockStatus Snapshot(string result) => new(
         result,
         _boardName,
-        _guard.CurrentChallenge,
-        _guard.CurrentChallengeQr,
-        (int)Math.Ceiling((sonuc?.Wait ?? _guard.RemainingWait).TotalSeconds),
-        sonuc?.AttemptsLeft ?? LockGuard.AttemptsPerRound,
+        _guard.CurrentCode,
+        (int)Math.Ceiling(_guard.RemainingLife.TotalSeconds),
         // Kilit ajani yapilandirmayi okuyamaz (dosya SYSTEM'e kapali),
         // bosta kalma suresini servisten ogrenir.
         _idleLockMinutes);
