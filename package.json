@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test pwa/test/*.test.mjs",
-    "test:core": "node --test pwa/test/core.test.mjs",
-    "test:ui": "node --test pwa/test/ui.test.mjs",
+    "test": "node --test tests/pwa/*.test.mjs",
+    "test:core": "node --test tests/pwa/core.test.mjs",
+    "test:ui": "node --test tests/pwa/ui.test.mjs",
     "vectors": "node spec/generate-vectors.mjs",
     "serve": "node tools/serve.mjs"
   },

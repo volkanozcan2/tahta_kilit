@@ -29,6 +29,17 @@ Kararların tamamı ve mimari: **[docs/TASARIM.md](docs/TASARIM.md)**
 test ediliyor, ama kilit ekranı, servis ve P/Invoke çağrıları sahada
 denenmedi.
 
+## Telefon uygulaması
+
+**https://tahta-kilit.netlify.app**
+
+Telefonda aç, tarayıcı menüsünden "Ana ekrana ekle" de. Kurulduktan sonra
+internet gerekmez. Sayfa herkese açıktır ama tek başına bir işe yaramaz:
+bir tahtayı açabilmek için o tahtanın eşleştirme karekodunu okutmuş olman
+gerekir.
+
+Yayınlamak için: `netlify.toml` yalnızca `pwa/` klasörünü yayınlar.
+
 ## Tahtaya kurmak
 
 > **Önce sanal makinede dene.** Kurulumdan sonra tahta yalnızca eşleşmiş bir

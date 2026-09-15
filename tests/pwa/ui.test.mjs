@@ -1,5 +1,5 @@
 // Tarayici ucu uca testi: uygulama gercekten acilip dogru sifreyi uretiyor mu?
-//   node --test pwa/test/ui.test.mjs
+//   node --test tests/pwa/ui.test.mjs
 //
 // Kamera basit bir test ortaminda taklit edilemedigi icin eslestirme dogrudan
 // kasaya yazilir; sonrasindaki akis (PIN, tahta secimi, elle kod, sifre) gercek
@@ -26,7 +26,7 @@ function chromiumYolu() {
   return existsSync(yol) ? yol : undefined;
 }
 
-const ROOT = new URL('../', import.meta.url).pathname;
+const ROOT = new URL('../../pwa/', import.meta.url).pathname;
 const vectors = JSON.parse(readFileSync(new URL('../../spec/vectors.json', import.meta.url), 'utf8'));
 const ORNEK = vectors.cases[0];
 

@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import {
   computeResponse, decodeKey, encodeKey, formatForDisplay,
   normalizeCode, normalizeResponse, parseChallengeQr, parsePairingQr,
-} from '../core.js';
+} from '../../pwa/core.js';
 
 const vectors = JSON.parse(
   readFileSync(new URL('../../spec/vectors.json', import.meta.url), 'utf8'),

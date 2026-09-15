@@ -1,0 +1,27 @@
+# Yalnizca telefon uygulamasi (pwa/) yayinlanir; kaynak kod ve Windows
+# projeleri yayina dahil edilmez.
+[build]
+  publish = "pwa"
+  command = ""
+
+# Uygulama ve service worker her zaman taze alinsin; asil onbellek
+# service worker'da.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    # Kamera yalnizca sayfanin kendisine acik; ucuncu taraf yok.
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
+
+# Netlify bu uzantiyi taniyamiyor; PWA kurulabilmesi icin dogru tur sart.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
+
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
