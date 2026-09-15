@@ -11,6 +11,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{614F0DA9
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TahtaKilit.Core.Tests", "tests\TahtaKilit.Core.Tests\TahtaKilit.Core.Tests.csproj", "{E1EA4A45-7222-4E6F-AD7A-9B340AC47CE4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TahtaKilit.Windows", "src\TahtaKilit.Windows\TahtaKilit.Windows.csproj", "{B15CDFE3-EA2E-4370-B98D-7F32C64B5EF3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TahtaKilit.Service", "src\TahtaKilit.Service\TahtaKilit.Service.csproj", "{FDB9B7EF-6654-445D-9E77-7F8C6ECC328C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,9 +32,19 @@ Global
 		{E1EA4A45-7222-4E6F-AD7A-9B340AC47CE4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E1EA4A45-7222-4E6F-AD7A-9B340AC47CE4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E1EA4A45-7222-4E6F-AD7A-9B340AC47CE4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B15CDFE3-EA2E-4370-B98D-7F32C64B5EF3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B15CDFE3-EA2E-4370-B98D-7F32C64B5EF3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B15CDFE3-EA2E-4370-B98D-7F32C64B5EF3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B15CDFE3-EA2E-4370-B98D-7F32C64B5EF3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FDB9B7EF-6654-445D-9E77-7F8C6ECC328C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FDB9B7EF-6654-445D-9E77-7F8C6ECC328C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FDB9B7EF-6654-445D-9E77-7F8C6ECC328C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FDB9B7EF-6654-445D-9E77-7F8C6ECC328C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{214EA0BD-4F77-4B17-AB39-3BEC5641BC4C} = {696B3933-F170-47B4-A917-B8D3B42B8DCD}
 		{E1EA4A45-7222-4E6F-AD7A-9B340AC47CE4} = {614F0DA9-E980-4B56-893F-C3392043FC45}
+		{B15CDFE3-EA2E-4370-B98D-7F32C64B5EF3} = {696B3933-F170-47B4-A917-B8D3B42B8DCD}
+		{FDB9B7EF-6654-445D-9E77-7F8C6ECC328C} = {696B3933-F170-47B4-A917-B8D3B42B8DCD}
 	EndGlobalSection
 EndGlobal

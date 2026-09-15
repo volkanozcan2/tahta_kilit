@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>tahta-kilit-service</UserSecretsId>
+    <AssemblyName>TahtaKilit.Service</AssemblyName>
+    <RootNamespace>TahtaKilit.Service</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TahtaKilit.Core\TahtaKilit.Core.csproj" />
+    <ProjectReference Include="..\TahtaKilit.Windows\TahtaKilit.Windows.csproj" />
+  </ItemGroup>
+
+</Project>
